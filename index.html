@@ -1942,8 +1942,9 @@ function boot() {
   state.journal = store.get(LS.journal, []);
   state.isa = Object.assign({ principal: 0, taxRate: 15.4, extraDiv: 0, targetMonthly: 1300000, autoDiv: true }, store.get(LS.isa, {}));
   state.custom = Object.assign({ mode: "merge", rows: [] }, store.get(LS.custom, {}));
-  state.ui = Object.assign({ tab: "reco", filter: "all", sort: "total", v: 2 }, store.get(LS.ui, {}));
-  if (state.ui.v !== 2) { state.ui.sort = "total"; state.ui.v = 2; store.set(LS.ui, state.ui); }
+  const savedUi = store.get(LS.ui, null);
+  state.ui = Object.assign({ tab: "reco", filter: "all", sort: "total", v: 2 }, savedUi || {});
+  if (!savedUi || savedUi.v !== 2) { state.ui.sort = "total"; state.ui.v = 2; store.set(LS.ui, state.ui); }
   const cache = store.get(LS.cache, null);
   if (cache && cache.rows && cache.rows.length) {
     state.sheet.rows = cache.rows.map(r => ({ ...r, src: "sheet" }));
