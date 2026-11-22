@@ -1294,24 +1294,24 @@ function bowlCalc(r) {
 
   /* 4번 — 급등 추격 */
   if (dev >= 25 || (fromLow != null && fromLow >= 100)) {
-    return { seat: 4, name: "4번 급등 추격", adj: -15, dev, fromLow, slope, crossGap, src,
+    return { seat: 4, name: "4번 급등 추격", adj: -12, dev, fromLow, slope, crossGap, src,
              note: "224선 위 " + fx(dev, 1) + "%" + lowTxt + " — 단테 기준으로 여기서부터는 추격 금지야." };
   }
   /* 3번 — 224선 돌파 뒤 눌림(핵심 타점). 세 선이 붙은 채 위에 있으면 돌파 완료로 본다 */
   if ((freshCross || (conv <= 5 && aboveAll)) && dev >= -4 && dev <= 15) {
-    const adj = dev > 8 ? 4 : dev > 3 ? 8 : 12;
+    const adj = dev > 8 ? 4 : dev > 3 ? 7 : 10;
     const name = crossGap == null ? "3번 세 선 수렴 돌파" : dev > 8 ? "3번 돌파 뒤 연장" : dev > 3 ? "3번 돌파 초입" : "3번 224선 돌파·눌림";
     return { seat: 3, name, adj, dev, fromLow, slope, crossGap, src,
              note: "224선 위 " + fx(dev, 1) + "%" + crossTxt + " — 단테 3번 자리(핵심 타점)야." };
   }
   /* 2번 — 224선이 평평한 바닥 횡보 */
   if (dev <= 0 && dev >= -12 && (slope == null || Math.abs(slope) <= 4) && (fromLow == null || fromLow <= 25)) {
-    return { seat: 2, name: "2번 바닥 횡보", adj: 3, dev, fromLow, slope, crossGap, src,
+    return { seat: 2, name: "2번 바닥 횡보", adj: 2, dev, fromLow, slope, crossGap, src,
              note: "224선 아래 " + fx(Math.abs(dev), 1) + "%에서 세력선이 평평" + lowTxt + " — 바닥을 다지는 2번 자리라 224선 돌파를 기다리는 구간이야." };
   }
   /* 1번 — 224선이 내려오는 하락·투매 */
   if (dev < -12) {
-    return { seat: 1, name: "1번 하락·투매", adj: -12, dev, fromLow, slope, crossGap, src,
+    return { seat: 1, name: "1번 하락·투매", adj: -10, dev, fromLow, slope, crossGap, src,
              note: "224선 아래 " + fx(Math.abs(dev), 1) + "%" + (slope == null ? "" : " · 224선 기울기 " + fx(slope, 1) + "%") + " — 아직 1번 하락 구간이야." };
   }
   return { seat: 0, name: "자리 확인 중", adj: 0, dev, fromLow, slope, crossGap, src,
@@ -1388,17 +1388,18 @@ function supplyNote(r, s) {
   return bits.join(" · ");
 }
 
-/* ── 세력선 40% (0~100): 기존 수렴·이격·매집 점수 + 정배열 보정 + 밥그릇 자리 ── */
+/* ── 세력선 40% (0~100): 수렴 40 · 224선자리 20 · 정배열 10 · 매집봉 15 · 배당 5 + 밥그릇 자리 ── */
 function lineOf(r) {
   const m = metrics(r);
   const bowl = bowlOf(r);
-  let trendAdj = 0;
-  if (m.trend === "정배열 진입") trendAdj = 6;
-  else if (m.trend === "112·224선 위") trendAdj = 3;
-  else if (m.trend === "224선 위") trendAdj = 1;
-  else if (m.trend === "역배열") trendAdj = -5;
-  const total = Math.round(clamp(m.total + trendAdj + bowl.adj, 0, 100));
-  return { ...m, base: m.total, trendAdj, bowl, total };
+  const convPart = clamp(40 - Math.max(0, m.conv - 1.2) * 2.8, 0, 40);
+  const posPart = clamp(m.posScore / 25 * 20, 0, 20);
+  const trendPart = m.trend === "정배열 진입" ? 10 : m.trend === "112·224선 위" ? 7 : m.trend === "224선 위" ? 4 : m.trend === "눌림 구간" ? 2 : 0;
+  const accPart = clamp(m.accScore / 20 * 15, 0, 15);
+  const divPart = clamp(m.divScore / 10 * 5, 0, 5);
+  const base = convPart + posPart + trendPart + accPart + divPart;
+  const total = Math.round(clamp(base + bowl.adj, 0, 100));
+  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, total };
 }
 
 /* ── 기업체력 20% (0~100): 기존 재무 점수 + 유보율·최대주주 안정성 ── */
@@ -1426,30 +1427,30 @@ function totalOf(r) {
            fundPart: fund.total == null ? null : fund.total * TOTAL_W_FUND };
 }
 function totalScore(r) { const t = totalOf(r).total; return t == null ? 0 : t; }
-/* 등급·판정도 총 매력도(4:4:2) 기준 — 88~95가 현실적 상단이라 86부터 A+로 둔다 */
+/* 등급·판정도 총 매력도(4:4:2) 기준 — 85~90이 현실적 상단이라 84부터 A+로 둔다 */
 function totalGrade(t) {
   if (t == null) return "—";
-  if (t >= 86) return "A+";
-  if (t >= 81) return "A";
-  if (t >= 76) return "B+";
-  if (t >= 70) return "B";
-  if (t >= 62) return "C+";
-  if (t >= 54) return "C";
+  if (t >= 84) return "A+";
+  if (t >= 78) return "A";
+  if (t >= 72) return "B+";
+  if (t >= 66) return "B";
+  if (t >= 58) return "C+";
+  if (t >= 50) return "C";
   return "D";
 }
 function totalVerdict(t) {
   if (t == null) return "자료 없음";
-  if (t >= 86) return "최우선 후보";
-  if (t >= 81) return "농사 지을 만한 자리";
-  if (t >= 74) return "눌림 오면 분할";
-  if (t >= 66) return "지켜보기";
+  if (t >= 84) return "최우선 후보";
+  if (t >= 78) return "농사 지을 만한 자리";
+  if (t >= 71) return "눌림 오면 분할";
+  if (t >= 63) return "지켜보기";
   return "관찰만";
 }
 
 /* 차트(세력선) vs 재무(기업 체력) 한 줄 판정 */
 function compareVerdict(chart, fund) {
   if (fund == null) return { cls: "info", text: "재무 지표가 없어 수급·세력선만으로 판단 — 설정에서 PER·PBR을 넣을 수 있어" };
-  const cg = chart >= 78, fg = fund >= 70;
+  const cg = chart >= 75, fg = fund >= 75;
   if (cg && fg) return { cls: "good", text: "세력선·재무 둘 다 좋아 — 농사 지을 만한 자리" };
   if (cg && !fg) return { cls: "warn", text: "세력선은 좋은데 재무가 약해 — 비중 줄이고 손절 짧게" };
   if (!cg && fg) return { cls: "info", text: "재무는 알찬데 세력선이 아직 — 224선 눌림 기다리기" };
@@ -2239,11 +2240,11 @@ function renderRecoSummary(rows) {
   if (!xs.length) { el.className = "cmpv info"; el.textContent = ""; return; }
   const avg = Math.round(xs.reduce((a, x) => a + x.o.total, 0) / xs.length);
   const best = xs.slice().sort((a, b) => b.o.total - a.o.total)[0];
-  const strong = xs.filter(x => x.o.total >= 81).length;
+  const strong = xs.filter(x => x.o.total >= 78).length;
   const both = xs.filter(x => x.o.line.total >= 75 && x.o.fund.total != null && x.o.fund.total >= 70).map(x => x.r.name);
   el.className = "cmpv good";
   el.innerHTML = "평균 총 매력도 " + avg + "점 · 최고 " + esc(best.r.name) + " " + best.o.total + "점" +
-    " · 81점+ " + strong + "종목" +
+    " · 78점+ " + strong + "종목" +
     (both.length ? " · 세력선·재무 둘 다 좋은 " + both.length + "개" : "");
 }
 
@@ -2280,7 +2281,7 @@ function rsCardHTML(r) {
       '<div><span>수급 40% 안 RS 몫</span><b>' + fx(supplyOf(r).rsPart, 1) + ' / 35점</b></div>' +
     '</div>' +
     '<div class="note">RS는 같은 기간 코스피 대비 초과 성과야. 시장이 무너질 때 덜 빠지거나 오르는 종목이 다음 상승장의 주도주가 되기 쉬워. 다만 시장이 강하게 반등하는 날은 그동안 버틴 종목이 쉬어갈 수 있으니, 1차 목표(+20%)에서 절반은 꼭 챙겨.</div>' +
-    '<p class="hint" style="margin:10px 2px 0">RS 종합점수 = 50 + 0.6×RS_20D + 0.4×RS_60D (50이 코스피와 같음). 등급 강함 60 이상 · 보통 40~59 · 약함 40 미만. 총 매력도의 수급 40% 안에서 35점 몫을 차지하고, 나머지 65점은 뚤림 거래량·매집 신호·위험경고로 채워.</p>' +
+    '<p class="hint" style="margin:10px 2px 0">RS 종합점수 = 50 + 0.6×RS_20D + 0.4×RS_60D (50이 코스피와 같음). 등급 강함 60 이상 · 보통 40~59 · 약함 40 미만. 총 매력도의 수급 40% 안에서 35점 몫을 차지하고, 나머지 65점은 눌림 거래량·매집 신호·위험경고로 채워.</p>' +
   '</div>';
 }
 function fundCardHTML(r, m) {
@@ -2549,16 +2550,16 @@ function openDetail(key) {
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>세력선(차트) 매력도</h3>' +
-      '<p class="hint">수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10, 여기에 정배열·밥그릇 자리 보정</p>' +
+      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리로 100점</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
         '<div class="big-gauge ' + gaugeClass(ln.total) + '" style="--p:' + ln.total + '"><span><b>' + ln.total + '</b><small>세력선 점수</small></span></div>' +
         '<div style="flex:1">' +
-          '<div class="brk"><span>세 선 수렴</span><i style="--w:' + barW(ln.convScore, 45) + '"></i><b>' + ln.convScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>224선 자리</span><i style="--w:' + barW(ln.posScore, 25) + '"></i><b>' + ln.posScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>매집봉</span><i style="--w:' + barW(ln.accScore, 20) + '"></i><b>' + ln.accScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(ln.divScore, 10) + '"></i><b>' + ln.divScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>정배열 보정</span><i style="--w:' + barW(Math.max(0, ln.trendAdj), 6) + '"></i><b>' + (ln.trendAdj > 0 ? "+" : "") + ln.trendAdj + '</b></div>' +
-          '<div class="brk"><span>밥그릇 ' + esc(ln.bowl.seat || "—") + '번</span><i style="--w:' + barW(Math.max(0, ln.bowl.adj), 12) + '"></i><b>' + (ln.bowl.adj > 0 ? "+" : "") + ln.bowl.adj + '</b></div>' +
+          '<div class="brk"><span>세 선 수렴</span><i style="--w:' + barW(ln.convPart, 40) + '"></i><b>' + ln.convPart.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>224선 자리</span><i style="--w:' + barW(ln.posPart, 20) + '"></i><b>' + ln.posPart.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>정배열</span><i style="--w:' + barW(ln.trendPart, 10) + '"></i><b>' + ln.trendPart.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>매집봉</span><i style="--w:' + barW(ln.accPart, 15) + '"></i><b>' + ln.accPart.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(ln.divPart, 5) + '"></i><b>' + ln.divPart.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>밥그릇 ' + esc(ln.bowl.seat || "—") + '번</span><i style="--w:' + barW(Math.max(0, ln.bowl.adj), 10) + '"></i><b>' + (ln.bowl.adj > 0 ? "+" : "") + ln.bowl.adj + '</b></div>' +
         '</div>' +
       '</div>' +
       '<div class="note">' + esc(ln.bowl.note) + '</div>' +
@@ -2573,7 +2574,7 @@ function openDetail(key) {
         '<div><span>224선 대비</span><b class="' + (dev != null && dev >= 0 ? "up" : "down") + '">' + pct(dev) + '</b></div>' +
         '<div><span>세 선 수렴도</span><b>' + pctAbs(ln.conv, 2) + '</b></div>' +
         '<div><span>추세 판정</span><b>' + esc(ln.trend) + '</b></div>' +
-        '<div><span>밥그릇 자툐</span><b>' + esc(ln.bowl.name) + '</b></div>' +
+        '<div><span>밥그릇 자리</span><b>' + esc(ln.bowl.name) + '</b></div>' +
       '</div>' +
     '</div>' +
     rsCardHTML(r) +
@@ -2619,7 +2620,7 @@ function openDetail(key) {
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 뚤림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10 + 정배열·밥그릇 자리 보정. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 차트는 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10). 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -2951,7 +2952,7 @@ function renderSetup() {
     '데이터: <a href="' + SHEET_URL + '" target="_blank" rel="noopener" style="color:var(--teal)">단테-세력선-추천</a> 구글 시트 (기준일 ' + esc(base || "—") + '). ' +
     '매매일지·설정은 이 브라우저(localStorage)에만 저장돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
-    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 뚤림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 45 + 224선 자리 25 + 매집봉 20 + 배당 10 + 정배열 보정 + 밥그릇 자리(3번 +12~4 · 4번 −15 · 1번 −12).<br>' +
+    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12).<br>' +
     '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·뉼림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
