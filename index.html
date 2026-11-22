@@ -1175,6 +1175,9 @@ function cardHTML(r, pos) {
 }
 function renderReco() {
   const rows = allRows().slice();
+  const FILTERS = ["all", "top", "acc", "div", "fund70", "mine"];
+  if (FILTERS.indexOf(state.ui.filter) < 0) state.ui.filter = "all";
+  $$("#filterChips .chip").forEach(c => c.classList.toggle("on", c.dataset.f === state.ui.filter));
   const held = new Set(holdings().filter(h => h.qty > 0).map(h => h.code || h.name));
   let list = rows.filter(r => {
     const f = state.ui.filter, m = metrics(r);
