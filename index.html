@@ -1162,7 +1162,7 @@ function cardHTML(r, pos) {
       fmCell("ROE", f.roe == null ? "—" : fx(f.roe, 1) + "%", f.roeB) +
       fmCell("부채비율", f.debt == null ? "—" : fx(f.debt, 0) + "%", f.debtB) +
     '</div>' +
-    '<div class="tline">총 매력도 <b>' + t + '점</b> · ' + esc(totalVerdict(t)) + ' — ' + cv.text + '</div>' +
+    '<div class="tline">총 매력도 <b>' + t + '점</b> — ' + cv.text + '</div>' +
     '<div class="sc-chips">' +
       '<span class="tag ' + (m.conv <= 3 ? "t-teal" : "") + '">세 선 수렴 ' + pctAbs(m.conv, 1) + '</span>' +
       '<span class="tag ' + (m.bars >= 3 ? "t-amber" : "") + '">매집봉 ' + m.bars + '회</span>' +
