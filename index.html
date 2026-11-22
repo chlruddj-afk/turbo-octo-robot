@@ -316,6 +316,31 @@ table.t tr:last-child td{border-bottom:none}
 .gloss .grow b{flex:0 0 58px;font-size:12px;letter-spacing:-0.02em}
 .gloss .grow span{flex:0 0 46px;font-size:9.5px;color:var(--dim)}
 .gloss .grow i{flex:1;font-style:normal;color:var(--muted);font-size:11px}
+
+/* ── 총 매력도(세력선 60% + 기업체력 40%) ── */
+.tscore{display:flex;align-items:center;gap:13px;margin-top:12px}
+.tgauge{--p:50;--c:var(--teal);position:relative;width:76px;height:76px;flex:0 0 76px;border-radius:50%;
+  background:conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,.07) 0);display:grid;place-items:center}
+.tgauge>span{width:62px;height:62px;border-radius:50%;background:#101827;display:grid;place-items:center;text-align:center;line-height:1}
+.tgauge b{display:block;font-size:25px;font-weight:800;letter-spacing:-0.035em}
+.tgauge small{display:block;font-size:8.5px;color:var(--dim);margin-top:3px;letter-spacing:-0.01em}
+.tgauge.mid{--c:var(--amber)} .tgauge.low{--c:var(--red)}
+.tbars{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.tblab{font-size:9px;font-weight:800;color:var(--dim);letter-spacing:.02em;margin-bottom:-2px}
+.tbar{display:flex;align-items:center;gap:7px}
+.tbar span{flex:0 0 46px;font-size:10px;font-weight:800;color:var(--dim);letter-spacing:-0.01em}
+.tbar i{flex:1;height:6px;border-radius:3px;background:#1b2740;overflow:hidden}
+.tbar i b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#1fae8f,#31d0aa)}
+.tbar.f i b{background:linear-gradient(90deg,#3b6fd4,#5b9cff)}
+.tbar em{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:800;color:var(--text);letter-spacing:-0.02em}
+.tbar em small{font-size:8.5px;font-weight:700;color:var(--dim);margin-left:3px;letter-spacing:0}
+.tbar.f em small{color:#7f96bb}
+.tline{font-size:10.5px;color:var(--dim);margin-top:11px;line-height:1.45}
+.tline b{color:var(--text);font-weight:700}
+.brk.w span{flex:0 0 74px}
+.brk.w b{flex:0 0 40px;font-variant-numeric:tabular-nums}
+.tsum{font-size:10.5px;color:var(--dim);margin-top:7px;line-height:1.45}
+.tsum b{color:var(--text);font-weight:700}
 </style>
 </head>
 <body>
@@ -352,6 +377,7 @@ table.t tr:last-child td{border-bottom:none}
           <button class="chip" data-act="filter" data-f="mine">보유</button>
         </div>
         <select class="sort" id="sortSel" aria-label="정렬">
+          <option value="total">총 매력도 순</option>
           <option value="rank">추천 순위</option>
           <option value="gauge">세력선 순</option>
           <option value="fund">체력 순</option>
@@ -370,7 +396,7 @@ table.t tr:last-child td{border-bottom:none}
         <div class="grow"><b>ROE</b><span>자기자본이익률</span><i>내 돈 굴려 얼마나 벌었나. 10% 이상이면 알짜</i></div>
         <div class="grow"><b>부채비율</b><span>빚 비율</span><i>100% 아래면 탄탄, 200% 넘으면 주의</i></div>
         <div class="grow"><b>시가총액</b><span>회사 덩치</span><i>회사 덩치. 클수록 하루 흔들림이 작아</i></div>
-        <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10.<br>카드에서 세력선 점수와 나란히 보면 “차트는 좋은데 재무가 어떤지” 한눈에 보여.</p>
+        <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10.<br>총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4. 위 카드에서 세력선·기업체력 점수를 나란히 보면 “차트는 좋은데 재무가 어떤지” 한눈에 보여.</p>
       </div>
     </section>
 
@@ -547,7 +573,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const LS = {
   cache:  "dante.reco.cache.v1",
   journal:"dante.journal.v1",
@@ -595,7 +621,7 @@ const state = {
   journal: [],
   isa: { principal:0, taxRate:15.4, extraDiv:0, targetMonthly:1300000, autoDiv:true },
   custom: { mode:"merge", rows:[] },
-  ui: { tab:"reco", filter:"all", sort:"rank" },
+  ui: { tab:"reco", filter:"all", sort:"total", v:2 },
   edit: { journalId:null, jType:"buy", stockCode:null },
   paste: { rows:null }
 };
@@ -925,6 +951,35 @@ function fundMetrics(r) {
   return { per, pbr, roe, debt, mcap, perS, pbrS, roeS, debtS, profitS, py, known, total, verdict, tone,
            perB: perBadge(per), pbrB: pbrBadge(pbr), roeB: roeBadge(roe), debtB: debtBadge(debt) };
 }
+/* ══════════ 총 매력도 = 세력선 60% + 기업체력 40% ══════════ */
+const TOTAL_W_CHART = 0.6, TOTAL_W_FUND = 0.4;
+/* 재무 지표가 비어 있으면 세력선 점수만으로 대신한다 */
+function totalOf(r) {
+  const m = metrics(r), f = fundMetrics(r);
+  const total = f.total == null ? m.total : Math.round(m.total * TOTAL_W_CHART + f.total * TOTAL_W_FUND);
+  return { m, f, total, chartPart: m.total * TOTAL_W_CHART, fundPart: f.total == null ? null : f.total * TOTAL_W_FUND };
+}
+function totalScore(r) { return totalOf(r).total; }
+/* 등급·판정도 총 매력도 기준으로 통일 */
+function totalGrade(t) {
+  if (t == null) return "—";
+  if (t >= 90) return "A+";
+  if (t >= 85) return "A";
+  if (t >= 80) return "B+";
+  if (t >= 72) return "B";
+  if (t >= 64) return "C+";
+  if (t >= 55) return "C";
+  return "D";
+}
+function totalVerdict(t) {
+  if (t == null) return "자료 없음";
+  if (t >= 90) return "최우선 후보";
+  if (t >= 85) return "농사 지을 만한 자리";
+  if (t >= 78) return "눌림 오면 분할";
+  if (t >= 68) return "지켜보기";
+  return "관찰만";
+}
+
 /* 차트(세력선) vs 재무(기업 체력) 한 줄 판정 */
 function compareVerdict(chart, fund) {
   if (fund == null) return { cls: "info", text: "재무 지표가 없어 차트만으로 판단 — 설정에서 PER·PBR을 넣을 수 있어" };
@@ -1026,7 +1081,8 @@ function renderHero() {
   const rows = allRows();
   const base = currentBase();
   const top = rows.slice().sort((a, b) => a.rank - b.rank)[0];
-  const avg = rows.length ? Math.round(rows.slice(0, 5).reduce((a, r) => a + metrics(r).total, 0) / Math.min(5, rows.length)) : 0;
+  const top5 = rows.slice().sort((a, b) => a.rank - b.rank).slice(0, 5);
+  const avg = top5.length ? Math.round(top5.reduce((a, r) => a + totalScore(r), 0) / top5.length) : 0;
   const accCount = rows.filter(r => r.bars >= 3).length;
   let sub = base ? base + " 종가 기준 · " + rows.length + "종목" : "시트에서 최신 추천을 불러오는 중…";
   if (base) {
@@ -1036,7 +1092,7 @@ function renderHero() {
   $("#heroSub").textContent = sub;
   $("#heroStats").innerHTML =
     '<div class="hs"><span>기준일</span><b style="font-size:14px;margin-top:5px">' + esc(base || "—") + '</b></div>' +
-    '<div class="hs"><span>TOP 평균 매력도</span><b>' + avg + '<small>점</small></b></div>' +
+    '<div class="hs"><span>TOP 평균 총매력도</span><b>' + avg + '<small>점</small></b></div>' +
     '<div class="hs"><span>매집봉 3회+</span><b>' + accCount + '<small>종목</small></b></div>';
   const sel = $("#sortSel");
   if (sel.value !== state.ui.sort) sel.value = state.ui.sort;
@@ -1069,29 +1125,35 @@ function lineMapHTML(r, compact) {
 function fmCell(label, value, badge) {
   return '<div class="fm b-' + badge.c + '"><span>' + esc(label) + '</span><b>' + esc(value) + '</b><em>' + esc(badge.t) + '</em></div>';
 }
-function cardHTML(r) {
-  const m = metrics(r);
-  const f = fundMetrics(r);
+function cardHTML(r, pos) {
+  const o = totalOf(r);
+  const m = o.m, f = o.f, t = o.total;
   const cv = compareVerdict(m.total, f.total);
   const dev = m.dev224;
-  const rankCls = r.rank === 1 ? "r1" : r.rank === 2 ? "r2" : "";
-  return '<button class="scard' + (r.rank === 1 ? " top1" : "") + '" data-act="detail" data-code="' + esc(r.code || r.name) + '">' +
+  const place = pos == null ? r.rank : pos;
+  const rankCls = place === 1 ? "r1" : place === 2 ? "r2" : "";
+  return '<button class="scard' + (place === 1 ? " top1" : "") + '" data-act="detail" data-code="' + esc(r.code || r.name) + '">' +
     '<div class="sc-head">' +
-      '<div class="rank ' + rankCls + '">' + (r.rank > 900 ? "·" : esc(r.rank)) + '</div>' +
+      '<div class="rank ' + rankCls + '">' + (place > 900 ? "·" : esc(place)) + '</div>' +
       '<div class="sc-name"><b>' + esc(r.name) + '</b><span>' + esc(r.code || "코드 없음") +
-        (r.grade ? '<em class="grade ' + gradeClass(r.grade) + '">' + esc(r.grade) + '</em>' : "") +
+        '<em class="grade ' + gradeClass(totalGrade(t)) + '">' + esc(totalGrade(t)) + '</em>' +
+        (r.rank <= 900 && r.rank !== place ? '<em class="tag">추천 ' + esc(r.rank) + '위</em>' : "") +
         (r.src === "local" ? '<em class="tag t-blue">내 수정</em>' : "") +
         (r.risk ? '<em class="tag t-red">위험</em>' : "") +
       '</span></div>' +
       '<div class="price"><b>' + won(r.price) + '</b><span>원 · 224선 ' + (dev == null ? "—" : pct(dev)) + '</span></div>' +
     '</div>' +
-    '<div class="dual">' +
-      '<div class="gwrap"><div class="gauge ' + gaugeClass(m.total) + '" style="--p:' + m.total + '"><span>' + m.total + '</span></div><em class="glab">세력선</em></div>' +
-      '<div class="gwrap"><div class="gauge ' + f.tone + '" style="--p:' + (f.total == null ? 0 : f.total) + '"><span>' + (f.total == null ? "—" : f.total) + '</span></div><em class="glab">기업체력</em></div>' +
-      '<div class="sc-mid">' +
-        '<div class="rowline"><b>' + esc(m.trend) + '</b><span>수렴 ' + pctAbs(m.conv, 1) + '</span></div>' +
-        lineMapHTML(r, true) +
+    '<div class="tscore">' +
+      '<div class="tgauge ' + gaugeClass(t) + '" style="--p:' + t + '"><span><b>' + t + '</b><small>총 매력도</small></span></div>' +
+      '<div class="tbars">' +
+        '<div class="tblab">세력선 60% + 기업체력 40%</div>' +
+        '<div class="tbar c"><span>세력선</span><i><b style="width:' + clamp(m.total, 0, 100) + '%"></b></i><em>' + m.total + '<small>60%</small></em></div>' +
+        '<div class="tbar f"><span>기업체력</span><i><b style="width:' + clamp(f.total || 0, 0, 100) + '%"></b></i><em>' + (f.total == null ? "—" : f.total) + '<small>40%</small></em></div>' +
       '</div>' +
+    '</div>' +
+    '<div class="sc-mid" style="margin-top:12px">' +
+      '<div class="rowline"><b>' + esc(m.trend) + '</b><span>수렴 ' + pctAbs(m.conv, 1) + '</span></div>' +
+      lineMapHTML(r, true) +
     '</div>' +
     '<div class="fundmini">' +
       fmCell("PER", f.per == null ? "—" : fx(f.per, 2) + "배", f.perB) +
@@ -1099,7 +1161,7 @@ function cardHTML(r) {
       fmCell("ROE", f.roe == null ? "—" : fx(f.roe, 1) + "%", f.roeB) +
       fmCell("부채비율", f.debt == null ? "—" : fx(f.debt, 0) + "%", f.debtB) +
     '</div>' +
-    '<div class="cmpv ' + cv.cls + '">차트 ' + m.total + ' · 재무 ' + (f.total == null ? "—" : f.total) + ' → ' + cv.text + '</div>' +
+    '<div class="tline">총 매력도 <b>' + t + '점</b> · ' + esc(totalVerdict(t)) + ' — ' + cv.text + '</div>' +
     '<div class="sc-chips">' +
       '<span class="tag ' + (m.conv <= 3 ? "t-teal" : "") + '">세 선 수렴 ' + pctAbs(m.conv, 1) + '</span>' +
       '<span class="tag ' + (m.bars >= 3 ? "t-amber" : "") + '">매집봉 ' + m.bars + '회</span>' +
@@ -1123,33 +1185,36 @@ function renderReco() {
     return true;
   });
   const s = state.ui.sort;
-  if (s === "gauge") list.sort((a, b) => metrics(b).total - metrics(a).total);
+  if (s === "total") list.sort((a, b) => totalScore(b) - totalScore(a));
+  else if (s === "gauge") list.sort((a, b) => metrics(b).total - metrics(a).total);
   else if (s === "fund") list.sort((a, b) => (fundMetrics(b).total == null ? -1 : fundMetrics(b).total) - (fundMetrics(a).total == null ? -1 : fundMetrics(a).total));
   else if (s === "conv") list.sort((a, b) => (metrics(a).conv) - (metrics(b).conv));
   else if (s === "div") list.sort((a, b) => (b.div || 0) - (a.div || 0));
-  else list.sort((a, b) => a.rank - b.rank);
+  else if (s === "rank") list.sort((a, b) => a.rank - b.rank);
+  else list.sort((a, b) => totalScore(b) - totalScore(a));
   const el = $("#recoList");
   renderRecoSummary(rows);
   if (!list.length) {
     el.innerHTML = '<div class="empty">조건에 맞는 종목이 없어.<br>필터를 바꾸거나 설정에서 종목을 추가해봐.</div>';
     return;
   }
-  el.innerHTML = list.map(cardHTML).join("");
+  el.innerHTML = list.map((r, i) => cardHTML(r, i + 1)).join("");
 }
 
 /* ══════════ 렌더: 추천 요약줄 ══════════ */
 function renderRecoSummary(rows) {
   const el = $("#recoSummary");
   if (!el) return;
-  const xs = rows.map(r => ({ r, m: metrics(r), f: fundMetrics(r) })).filter(x => x.f.total != null);
+  const xs = rows.map(r => ({ r, o: totalOf(r) }));
   if (!xs.length) { el.className = "cmpv info"; el.textContent = ""; return; }
-  const avgC = Math.round(xs.reduce((a, x) => a + x.m.total, 0) / xs.length);
-  const avgF = Math.round(xs.reduce((a, x) => a + x.f.total, 0) / xs.length);
-  const best = xs.slice().sort((a, b) => b.f.total - a.f.total)[0];
-  const both = xs.filter(x => x.m.total >= 75 && x.f.total >= 70).map(x => x.r.name);
+  const avg = Math.round(xs.reduce((a, x) => a + x.o.total, 0) / xs.length);
+  const best = xs.slice().sort((a, b) => b.o.total - a.o.total)[0];
+  const strong = xs.filter(x => x.o.total >= 85).length;
+  const both = xs.filter(x => x.o.m.total >= 75 && x.o.f.total != null && x.o.f.total >= 70).map(x => x.r.name);
   el.className = "cmpv good";
-  el.innerHTML = "평균 차트 " + avgC + "점 · 재무 " + avgF + "점 · 재무 최고 " + esc(best.r.name) + " " + best.f.total + "점" +
-    (both.length ? " · 둘 다 좋은 종목 " + both.length + "개" : "");
+  el.innerHTML = "평균 총 매력도 " + avg + "점 · 최고 " + esc(best.r.name) + " " + best.o.total + "점" +
+    " · 85점+ " + strong + "종목" +
+    (both.length ? " · 차트·재무 둘 다 좋은 " + both.length + "개" : "");
 }
 
 /* ══════════ 상세 시트 ══════════ */
@@ -1199,8 +1264,8 @@ function fundCardHTML(r, m) {
 function openDetail(key) {
   const r = findRow(key);
   if (!r) return;
-  const m = metrics(r);
-  const f = fundMetrics(r);
+  const o = totalOf(r);
+  const m = o.m, f = o.f, t = o.total, tg = totalGrade(t);
   const cv = compareVerdict(m.total, f.total);
   const dev = m.dev224;
   const buyGap = (b) => (b && r.price) ? ((b - r.price) / r.price * 100) : null;
@@ -1211,21 +1276,38 @@ function openDetail(key) {
     '<div class="sheet-head">' +
       '<div><h2>' + esc(r.name) + '</h2>' +
         '<div class="sub">' + esc(r.code || "코드 없음") + ' · 기준일 ' + esc(r.base || currentBase() || "—") +
-        (r.grade ? ' · <span class="grade ' + gradeClass(r.grade) + '">' + esc(r.grade) + '</span>' : "") + '</div></div>' +
+        ' · <span class="grade ' + gradeClass(tg) + '">' + esc(tg) + '</span> ' + esc(totalVerdict(t)) + '</div></div>' +
       '<button class="icon-btn" data-act="closeDetail" aria-label="닫기">✕</button>' +
     '</div>' +
-    '<div class="duel">' +
-      '<div class="d ' + gaugeClass(m.total) + '"><span>세력선(차트)</span><b>' + m.total + '<small>점</small></b><div class="mini"><i style="width:' + m.total + '%"></i></div></div>' +
-      '<div class="d ' + f.tone + '"><span>기업 체력(재무)</span><b>' + (f.total == null ? "—" : f.total) + '<small>점</small></b><div class="mini"><i style="width:' + (f.total || 0) + '%"></i></div></div>' +
+    '<div class="card" style="margin:0 0 12px">' +
+      '<h3>총 매력도</h3>' +
+      '<p class="hint">' + (f.total == null
+        ? '기업체력 지표가 비어 있어 세력선 점수만 반영했어.'
+        : '세력선 60% + 기업체력 40% 가중 합산 · 100점 만점') + '</p>' +
+      '<div style="display:flex;gap:16px;align-items:center">' +
+        '<div class="big-gauge ' + gaugeClass(t) + '" style="--p:' + t + '"><span><b>' + t + '</b><small>총 매력도</small></span></div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="brk w"><span>세력선 60%</span><i style="--w:' + barW(m.total, 100) + '"></i><b>' + fx(o.chartPart, 1) + '</b></div>' +
+          '<div class="brk w"><span>기업체력 40%</span><i style="--w:' + barW(f.total || 0, 100) + '"></i><b>' + (f.total == null ? "—" : fx(o.fundPart, 1)) + '</b></div>' +
+          '<div class="tsum">' + (f.total == null
+            ? '세력선 ' + m.total + '점 → <b>총 ' + t + '점</b>'
+            : '세력선 ' + m.total + ' × 0.6 = ' + fx(o.chartPart, 1) + ' · 기업체력 ' + f.total + ' × 0.4 = ' + fx(o.fundPart, 1) +
+              ' → <b>총 ' + t + '점</b>') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cmpv ' + cv.cls + '" style="margin:12px 0 0">' + cv.text + '</div>' +
     '</div>' +
-    '<div class="cmpv ' + cv.cls + '" style="margin:-4px 2px 12px">' + cv.text + '</div>' +
-    '<div style="display:flex;gap:16px;align-items:center;margin-bottom:6px">' +
-      '<div class="big-gauge ' + gaugeClass(m.total) + '" style="--p:' + m.total + '"><span><b>' + m.total + '</b><small>세력선 매력도</small></span></div>' +
-      '<div style="flex:1">' +
-        '<div class="brk"><span>세 선 수렴</span><i style="--w:' + barW(m.convScore, 45) + '"></i><b>' + m.convScore.toFixed(0) + '</b></div>' +
-        '<div class="brk"><span>224선 자리</span><i style="--w:' + barW(m.posScore, 25) + '"></i><b>' + m.posScore.toFixed(0) + '</b></div>' +
-        '<div class="brk"><span>매집봉</span><i style="--w:' + barW(m.accScore, 20) + '"></i><b>' + m.accScore.toFixed(0) + '</b></div>' +
-        '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(m.divScore, 10) + '"></i><b>' + m.divScore.toFixed(0) + '</b></div>' +
+    '<div class="card" style="margin:0 0 12px">' +
+      '<h3>세력선(차트) 매력도</h3>' +
+      '<p class="hint">수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10</p>' +
+      '<div style="display:flex;gap:16px;align-items:center">' +
+        '<div class="big-gauge ' + gaugeClass(m.total) + '" style="--p:' + m.total + '"><span><b>' + m.total + '</b><small>세력선 점수</small></span></div>' +
+        '<div style="flex:1">' +
+          '<div class="brk"><span>세 선 수렴</span><i style="--w:' + barW(m.convScore, 45) + '"></i><b>' + m.convScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>224선 자리</span><i style="--w:' + barW(m.posScore, 25) + '"></i><b>' + m.posScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>매집봉</span><i style="--w:' + barW(m.accScore, 20) + '"></i><b>' + m.accScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(m.divScore, 10) + '"></i><b>' + m.divScore.toFixed(0) + '</b></div>' +
+        '</div>' +
       '</div>' +
     '</div>' +
     '<div class="card" style="margin:12px 0">' +
@@ -1258,14 +1340,14 @@ function openDetail(key) {
         '<div><span>최대 매집 배수</span><b>' + (m.mult ? m.mult.toFixed(2) + '배' : "—") + '</b></div>' +
         '<div><span>배당률</span><b>' + (r.div == null ? "—" : pctAbs(r.div, 2)) + '</b></div>' +
         '<div><span>연속배당</span><b>' + esc(r.years || "—") + '</b></div>' +
-        '<div><span>스크리닝 점수</span><b>' + (r.score == null ? "—" : r.score + "점") + '</b></div>' +
+        '<div><span>시트 점수·등급</span><b>' + (r.score == null ? "—" : r.score + "점") + ' · ' + esc(r.grade || "—") + '</b></div>' +
         '<div><span>흑자</span><b>' + (r.surplus === null ? "—" : r.surplus ? "Y" : "N") + '</b></div>' +
       '</div>' +
       (r.accDetail ? '<p class="hint" style="margin:10px 0 0">' + esc(r.accDetail) + '</p>' : "") +
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">세력선 매력도 = 수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 차트는 타이밍, 재무는 회사의 튼튼함이야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 (반올림). 세력선 = 수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 차트는 타이밍, 재무는 회사의 튼튼함이야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -1487,7 +1569,7 @@ function renderSetup() {
     '데이터: <a href="' + SHEET_URL + '" target="_blank" rel="noopener" style="color:var(--teal)">단테-세력선-추천</a> 구글 시트 (기준일 ' + esc(base || "—") + '). ' +
     '매매일지·설정은 이 브라우저(localStorage)에만 저장돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
-    '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. PER·PBR은 최근 분기 실적(TTM), ROE·부채비율은 2025 사업연도 결산 기준(2026-11-22 네이버금융 조회).<br>' +
+    '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4. PER·PBR은 최근 분기 실적(TTM), ROE·부채비율은 2025 사업연도 결산 기준(2026-11-22 네이버금융 조회).<br>' +
     '매매 권유가 아닌 판단 보조 자료야. 11/23(월) 개장 후 수치는 달라지고, 삼진제약은 11/23 기자간담회 결과에 따라 갭이 날 수 있어. 손절선은 꼭 같이 걸어둬.';
   const dl = $("#stockList");
   if (dl) dl.innerHTML = allRows().map(r => '<option value="' + esc(r.name) + '">' + esc(r.code || "") + '</option>').join("");
@@ -1860,7 +1942,8 @@ function boot() {
   state.journal = store.get(LS.journal, []);
   state.isa = Object.assign({ principal: 0, taxRate: 15.4, extraDiv: 0, targetMonthly: 1300000, autoDiv: true }, store.get(LS.isa, {}));
   state.custom = Object.assign({ mode: "merge", rows: [] }, store.get(LS.custom, {}));
-  state.ui = Object.assign({ tab: "reco", filter: "all", sort: "rank" }, store.get(LS.ui, {}));
+  state.ui = Object.assign({ tab: "reco", filter: "all", sort: "total", v: 2 }, store.get(LS.ui, {}));
+  if (state.ui.v !== 2) { state.ui.sort = "total"; state.ui.v = 2; store.set(LS.ui, state.ui); }
   const cache = store.get(LS.cache, null);
   if (cache && cache.rows && cache.rows.length) {
     state.sheet.rows = cache.rows.map(r => ({ ...r, src: "sheet" }));
