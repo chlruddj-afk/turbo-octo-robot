@@ -135,6 +135,31 @@ select.sort{background:var(--card);border:1px solid var(--line);color:var(--mute
 .sc-foot b{color:var(--muted);font-weight:700}
 .sc-foot .stop{color:var(--red)}
 
+/* ── v1.6.0 업종 · 52주신저가 · 증거금 · 피라미드 ── */
+.tag.t-dim{background:#16202f;color:var(--dim)}
+.sectwarn{margin:0 2px 10px;padding:10px 12px;border-radius:12px;background:rgba(244,98,106,.08);border:1px solid rgba(244,98,106,.28);color:#f7cdd0;font-size:12px;line-height:1.45}
+.sectwarn b{color:var(--red)}
+.sectwarn .sm{display:block;margin-top:3px;font-size:10.5px;color:var(--muted)}
+.pyr table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.pyr th,.pyr td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.pyr th{color:var(--dim);font-weight:600;font-size:10.5px}
+.pyr td:first-child,.pyr th:first-child{text-align:left}
+.pyr td small{display:block;font-size:9.5px;color:var(--dim)}
+.pyr tr.total td{border-bottom:none;font-weight:800;color:var(--text);padding-top:9px}
+.pyr tr.total td span{font-size:10px;color:var(--dim);font-weight:600}
+.pyr input[type=number]{flex:1;min-width:0;background:#0f1826;border:1px solid var(--line);border-radius:10px;color:var(--text);font:inherit;font-weight:700;padding:8px 10px}
+.pyrchk{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border:1px solid var(--line);border-radius:11px;margin-top:7px;font-size:11.5px;color:var(--muted);cursor:pointer;line-height:1.4}
+.pyrchk input{width:17px;height:17px;margin:1px 0 0;accent-color:var(--teal);flex:0 0 auto}
+.pyrchk b{color:var(--text);font-weight:700;display:block;font-size:12px;margin-bottom:1px}
+.pyrchk.on{border-color:rgba(49,208,170,.45);background:rgba(49,208,170,.07)}
+.pyrgo{margin-top:9px;padding:10px 12px;border-radius:12px;font-size:12px;font-weight:700;line-height:1.45;background:rgba(240,180,41,.1);border:1px solid rgba(240,180,41,.3);color:var(--amber)}
+.pyrgo.ok{background:rgba(49,208,170,.1);border-color:rgba(49,208,170,.35);color:var(--teal)}
+.pyrgoal{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pyrgoal div{flex:1 1 46%;background:#101a29;border:1px solid var(--line);border-radius:11px;padding:8px 10px}
+.pyrgoal span{display:block;font-size:10px;color:var(--dim)}
+.pyrgoal b{font-size:14px;letter-spacing:-0.01em}
+.pyrgoal em{display:block;font-style:normal;font-size:10px;color:var(--dim);margin-top:2px}
+
 /* ── detail sheet ── */
 .sheet{position:fixed;inset:0;z-index:60;background:rgba(4,7,12,.72);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
 .sheet-inner{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;background:#0d1524;border:1px solid var(--line);
@@ -496,6 +521,7 @@ table.t tr:last-child td{border-bottom:none}
         </select>
       </div>
       <div class="cmpv info" id="recoSummary" style="margin:0 2px 10px"></div>
+      <div id="sectorWarn"></div>
       <div id="recoList" class="cards"></div>
 
       <div class="card gloss" style="margin-top:14px">
@@ -520,6 +546,7 @@ table.t tr:last-child td{border-bottom:none}
         <h2>매매일지</h2>
         <p>산 이유와 손절선을 같이 남겨야 복기가 된다</p>
       </div>
+      <div id="sectorWarnJournal"></div>
       <div class="stat-grid" id="jSummary"></div>
       <div class="card" id="j3m"></div>
 
@@ -608,7 +635,7 @@ table.t tr:last-child td{border-bottom:none}
 
       <div class="card">
         <h3>표 붙여넣기</h3>
-        <p class="hint">시트나 엑셀에서 복사한 표를 그대로 붙여넣어. 콤마·탭 둘 다 인식하고, 34열(유보율·최대주주·눌림거래량·경고 포함)이나 예전 30열·27열·22열·10열 형식도 돼. PER·PBR·ROE·부채비율·시가총액 열이 있으면 기업 체력 점수도, RS 열이 있으면 상대강도도 같이 계산해.</p>
+        <p class="hint">시트나 엑셀에서 복사한 표를 그대로 붙여넣어. 콤마·탭 둘 다 인식하고, 38열(업종·52주신저가·증거금 포함)이나 예전 34열·30열·27열·22열·10열 형식도 돼. PER·PBR·ROE·부채비율·시가총액 열이 있으면 기업 체력 점수도, RS 열이 있으면 상대강도도 같이 계산해.</p>
         <textarea id="pasteBox" rows="5" placeholder="종목명,종목코드,현재가,112일선,224일선,448일선,수렴도(%),매집봉(Y/N),매집봉상세,배당률(%),연속배당,흑자(Y/N),위험(Y/N),점수,등급,1차매수,2차매수,3차매수,손절가,한줄근거,PER,PBR,ROE,부채비율,시가총액(억)"></textarea>
         <div class="row">
           <button class="btn ghost" type="button" data-act="pastePreview">미리보기</button>
@@ -699,7 +726,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const LS = {
   cache:  "dante.reco.cache.v1",
@@ -749,13 +776,13 @@ const FUND_TREND = {
 
 /* ── 김종봉 재무 안정성(유보율·최대주주) + 김정수 눌림·경고 기본값(시트 AE~AH열, 2026-11-23 조회) ── */
 const SIGNAL_SEED = {
-  "122900": { reserve:2029.96, major:43.11, pullVol:10.5, warnText:"" },
-  "005500": { reserve:2153.20, major:13.41, pullVol:30.4, warnText:"장대음봉 주의" },
-  "032640": { reserve:246.54,  major:38.75, pullVol:19.4, warnText:"윗꼬리 음봉 주의" },
-  "016580": { reserve:4233.71, major:23.28, pullVol:39.2, warnText:"" },
-  "054950": { reserve:3806.76, major:39.19, pullVol:35.0, warnText:"" },
-  "009160": { reserve:3170.37, major:61.72, pullVol:20.4, warnText:"" },
-  "011200": { reserve:346.56,  major:35.42, pullVol:17.3, warnText:"" }
+  "122900": { reserve:2029.96, major:43.11, pullVol:10.5, warnText:"", industry:"상업서비스와공급품", low52:19.0, margin:"신용가능" },
+  "005500": { reserve:2153.20, major:13.41, pullVol:30.4, warnText:"장대음봉 주의", industry:"제약", low52:17.4, margin:"신용가능" },
+  "032640": { reserve:246.54,  major:38.75, pullVol:19.4, warnText:"윗꼬리 음봉 주의", industry:"무선통신서비스", low52:11.0, margin:"신용가능" },
+  "016580": { reserve:4233.71, major:23.28, pullVol:39.2, warnText:"", industry:"제약", low52:19.5, margin:"신용가능" },
+  "054950": { reserve:3806.76, major:39.19, pullVol:35.0, warnText:"", industry:"건강관리장비와용품", low52:28.7, margin:"신용가능" },
+  "009160": { reserve:3170.37, major:61.72, pullVol:20.4, warnText:"", industry:"비철금속", low52:36.9, margin:"신용가능" },
+  "011200": { reserve:346.56,  major:35.42, pullVol:17.3, warnText:"", industry:"해운사", low52:22.3, margin:"신용가능" }
 };
 
 /* ── 상태 ── */
@@ -843,6 +870,10 @@ const nk = s => String(s == null ? "" : s).replace(/\s+/g, "").toLowerCase();
 
 const FIELD_RULES = [
   ["accDetail", h => h.indexOf("매집봉상세") === 0 || h.indexOf("매집상세") === 0],
+  ["low52Warn", h => h.indexOf("52주신저가경고") === 0 || h.indexOf("신저가경고") === 0],
+  ["low52",     h => h.indexOf("52주신저가") === 0 || h.indexOf("신저가대비") === 0],
+  ["industry",  h => h.indexOf("업종") === 0 || h === "섹터" || h === "sector"],
+  ["margin",    h => h.indexOf("증거금") === 0],
   ["warnText",  h => h.indexOf("위험경고") === 0 || h === "경고" || h.indexOf("경고") === 0],
   ["reserve",   h => h.indexOf("유보율") === 0],
   ["major",     h => h.indexOf("최대주주") === 0],
@@ -879,6 +910,8 @@ const FIELD_RULES = [
 ];
 const ORDER22 = ["base","rank","name","code","price","ma112","ma224","ma448","conv","acc","accDetail","div","years","surplus","risk","score","grade","buy1","buy2","buy3","stop","note"];
 const ORDER27 = ORDER22.concat(["per","pbr","roe","debt","mcap"]);
+const ORDER34 = ORDER27.concat(["rs20","rs60","rsGrade","reserve","major","pullVol","warnText"]);
+const ORDER38 = ORDER34.concat(["industry","low52","low52Warn","margin"]);
 const ORDER10 = ["name","code","price","ma224","ma448","acc","div","years","surplus","risk"];
 
 function headerMap(header) {
@@ -906,7 +939,9 @@ function rowsToObjects(rows) {
     if (map) {
       Object.keys(map).forEach(k => { o[k] = r[map[k]]; });
       if (!o.name) { const i = r.findIndex(c => c && num(c) === null && String(c).trim()); if (i >= 0) o.name = r[i]; }
-    } else if (r.length >= 27) ORDER27.forEach((k, i) => { o[k] = r[i]; });
+    } else if (r.length >= 38) ORDER38.forEach((k, i) => { o[k] = r[i]; });
+    else if (r.length >= 34) ORDER34.forEach((k, i) => { o[k] = r[i]; });
+    else if (r.length >= 27) ORDER27.forEach((k, i) => { o[k] = r[i]; });
     else if (r.length >= 20) ORDER22.forEach((k, i) => { o[k] = r[i]; });
     else ORDER10.forEach((k, i) => { o[k] = r[i]; });
     const row = normRow(o);
@@ -959,6 +994,10 @@ function normRow(o) {
     note: String(o.note == null ? "" : o.note).trim(),
     reserve: num(o.reserve), major: num(o.major), pullVol: num(o.pullVol),
     warnText: (/^(없음|-|n\/?a)$/i.test(String(o.warnText == null ? "" : o.warnText).trim()) ? "" : String(o.warnText == null ? "" : o.warnText).trim()),
+    industry: (String(o.industry == null ? "" : o.industry).trim() || String((SIGNAL_SEED[code] || {}).industry || "").trim()),
+    low52: (num(o.low52) != null ? num(o.low52) : (num((SIGNAL_SEED[code] || {}).low52) != null ? num(SIGNAL_SEED[code].low52) : null)),
+    low52Warn: String(o.low52Warn == null ? "" : o.low52Warn).trim(),
+    margin: (String(o.margin == null ? "" : o.margin).trim() || String((SIGNAL_SEED[code] || {}).margin || "").trim()),
     src: "sheet"
   };
 }
@@ -1075,6 +1114,44 @@ function sigHTML(r) {
   if (!w.length) out += '<span class="sig ok">✅ 경고 없음</span>';
   else out += '<span class="sig ' + (w.some(x => /장대음봉|2배/.test(x)) ? "bad" : "mid") + '">⚠️ ' + esc(w.join(" · ")) + '</span>';
   return out;
+}
+/* ── v1.6.0 업종·52주신저가·증거금 판정 ── */
+function low52Flag(r) {
+  const t = String((r && r.low52Warn) || "").trim();
+  if (/주의|위험|이탈|경고/.test(t)) return true;
+  if (/안전|정상|없음/.test(t)) return false;
+  const g = (r && r.low52 != null) ? Number(r.low52) : null;
+  return g != null && !isNaN(g) && g <= 3;
+}
+function marginFlag(r) {
+  const t = String((r && r.margin) || "").trim();
+  if (!t || /미확인|^-$/.test(t)) return null;            // 자료 없음
+  if (/100|불가|현금|없음/.test(t)) return "100";          // 신용 불가 = 현금 100%
+  return "credit";                                       // 신용가능(20~60%)
+}
+function sigExtraHTML(r) {
+  let out = "";
+  if (low52Flag(r)) {
+    out += '<span class="sig bad">⚠️ 52주 신저가 주의' + (r.low52 == null ? "" : ' ' + pct(r.low52, 1)) + '</span>';
+  }
+  if (marginFlag(r) === "100") out += '<span class="sig mid">⚠️ 증거금100%</span>';
+  return out;
+}
+function sectorOf(r) {
+  const t = String((r && r.industry) || "").trim();
+  return (!t || /미확인|^-$/.test(t)) ? "" : t;
+}
+function sectorGroups(rows) {
+  const m = new Map();
+  (rows || []).forEach(r => { const k = sectorOf(r); if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
+  return Array.from(m.entries()).filter(e => e[1].length >= 2).sort((a, b) => b[1].length - a[1].length);
+}
+function sectorWarnHTML(rows, label) {
+  const g = sectorGroups(rows);
+  if (!g.length) return "";
+  return g.map(([k, v]) => '<div class="sectwarn">⚠️ <b>같은 업종 중복 주의</b> — ' + esc(k) + ' ' + v.length + '종목(' +
+      esc(v.map(x => x.name).join(" · ")) + '). 같은 업종 ' + v.length + '개는 분산이 아니라 1섹터 몰빵이야. 하나만 고르거나 비중을 나눠.' +
+      (label ? '<span class="sm">' + esc(label) + '</span>' : '') + '</div>').join("");
 }
 /* 최근 3년 연속 흑자 연수 — 시트에 이력이 없으면 흑자(Y/N)로 대신 */
 function profitYears(r) {
@@ -1897,6 +1974,7 @@ function cardHTML(r, pos) {
       '<div class="rank ' + rankCls + '">' + (place > 900 ? "·" : esc(place)) + '</div>' +
       '<div class="sc-name"><b>' + esc(r.name) + '</b><span>' + esc(r.code || "코드 없음") +
         '<em class="grade ' + gradeClass(totalGrade(t)) + '">' + esc(totalGrade(t)) + '</em>' +
+        (sectorOf(r) ? '<em class="tag t-dim">' + esc(sectorOf(r)) + '</em>' : '') +
         (r.rank <= 900 && r.rank !== place ? '<em class="tag">추천 ' + esc(r.rank) + '위</em>' : "") +
         (r.src === "local" ? '<em class="tag t-blue">내 수정</em>' : "") +
         (r.risk ? '<em class="tag t-red">위험</em>' : "") +
@@ -1907,7 +1985,7 @@ function cardHTML(r, pos) {
       (r.rs60 != null ? '<span>60일 <b>' + pct(r.rs60, 1) + 'p</b></span>' : '') +
       (o.rs != null ? '<span>RS 점수 <b>' + o.rs + '</b> · 총매력도 보정 <b>' + (o.rsAdj > 0 ? '+' : '') + o.rsAdj + '</b></span>' : '') +
     '</div>' +
-    '<div class="sigrow">' + sigHTML(r) + '</div>' +
+    '<div class="sigrow">' + sigHTML(r) + sigExtraHTML(r) + '</div>' +
     '<div class="tscore">' +
       '<div class="tgauge ' + gaugeClass(t) + '" style="--p:' + t + '"><span><b>' + t + '</b><small>총 매력도</small></span></div>' +
       '<div class="tbars">' +
@@ -1931,6 +2009,8 @@ function cardHTML(r, pos) {
       '<span class="tag ' + (m.conv <= 3 ? "t-teal" : "") + '">세 선 수렴 ' + pctAbs(m.conv, 1) + '</span>' +
       '<span class="tag ' + (m.bars >= 3 ? "t-amber" : "") + '">매집봉 ' + m.bars + '회</span>' +
       '<span class="tag t-blue">배당 ' + (r.div == null ? "—" : pctAbs(r.div, 2)) + '</span>' +
+      (r.low52 != null ? '<span class="tag ' + (low52Flag(r) ? "t-red" : "") + '">52주저가 ' + pct(r.low52, 1) + '</span>' : "") +
+      (marginFlag(r) === "credit" ? '<span class="tag t-teal">신용가능</span>' : (marginFlag(r) === "100" ? '<span class="tag t-amber">증거금100%</span>' : "")) +
       (r.years ? '<span class="tag">' + esc(r.years) + ' 연속</span>' : "") +
       (f.mcap != null ? '<span class="tag">시총 ' + capText(f.mcap) + '</span>' : "") +
     '</div>' +
@@ -1964,6 +2044,8 @@ function renderReco() {
   else list.sort((a, b) => totalScore(b) - totalScore(a));
   const el = $("#recoList");
   renderRecoSummary(rows);
+  const sw = $("#sectorWarn");
+  if (sw) sw.innerHTML = sectorWarnHTML(list, "보여지는 " + list.length + "종목 기준 · 업종은 네이버금융 분류");
   if (!list.length) {
     el.innerHTML = '<div class="empty">조건에 맞는 종목이 없어.<br>필터를 바꾸거나 설정에서 종목을 추가해봐.</div>';
     return;
@@ -2131,6 +2213,121 @@ function signalCardHTML(r) {
       '기준일 ' + esc(r.base || currentBase() || "—") + ' 차트데이터 계산값이야.</p>' +
   '</div>';
 }
+/* ══════════ v1.6.0 1:1:2:4 피라미드 물타기 ══════════ */
+const LS_PYRAMID = "dante.pyramid.v1";
+let pyrRow = null;
+function pyrOf(key) {
+  const all = store.get(LS_PYRAMID, {}) || {};
+  const d = (all[key] && typeof all[key] === "object") ? all[key] : {};
+  const amt = Number(d.amt);
+  return { amt: amt > 0 ? amt : 500000, c1: !!d.c1, c2: !!d.c2 };
+}
+function pyrSet(key, patch) {
+  const all = store.get(LS_PYRAMID, {}) || {};
+  all[key] = { ...pyrOf(key), ...patch };
+  store.set(LS_PYRAMID, all);
+}
+function pyrCalc(r, amt) {
+  const a = Number(amt) > 0 ? Number(amt) : 0;
+  const p1 = r.buy1 || r.price || null;
+  const p2 = r.buy2 || (p1 ? Math.round(p1 * 0.93) : null);
+  const p3 = r.buy3 || (p2 ? Math.round(p2 * 0.96) : null);
+  const p4 = p3 ? Math.round(p3 * 0.85) : null;
+  const st = [
+    { n: 1, w: 1, p: p1, tag: "현재가 상차" },
+    { n: 2, w: 1, p: p2, tag: "112·448선" },
+    { n: 3, w: 2, p: p3, tag: "224선" },
+    { n: 4, w: 4, p: p4, tag: "3차 -15%" }
+  ];
+  st.forEach(s => { s.a = a * s.w; s.q = s.p ? s.a / s.p : null; });
+  const total = a * 8;
+  const qAll = st.reduce((x, s) => x + (s.q || 0), 0);
+  const avgAll = qAll ? total / qAll : null;
+  const q2 = (st[0].q || 0) + (st[1].q || 0);
+  const avg2 = q2 ? (st[0].a + st[1].a) / q2 : null;
+  return { st, total, qAll, avgAll, avg2, p1 };
+}
+function pyrCardHTML(r) {
+  const key = r.code || r.name;
+  const pv = pyrOf(key);
+  const c = pyrCalc(r, pv.amt);
+  pyrRow = r;
+  if (!c.p1) {
+    return '<div class="card" id="pyrCard" style="margin:12px 0"><h3>1:1:2:4 피라미드 물타기</h3>' +
+      '<div class="note warn">1차 매수 기준가가 없어서 계산할 수 없어. 시트에 1차매수·현재가가 있어야 해.</div></div>';
+  }
+  const cell = (s) => '<tr><td>' + s.n + '차<small>' + esc(s.tag) + '</small></td><td>' + s.w + '배</td>' +
+    '<td id="pyrA' + s.n + '">' + won(s.a) + '원</td>' +
+    '<td>' + won(s.p) + '원<small id="pyrP' + s.n + '">-</small></td>' +
+    '<td id="pyrQ' + s.n + '">' + (s.q == null ? "—" : fxInt(s.q) + '주') + '</td></tr>';
+  return '<div class="card pyr" id="pyrCard" style="margin:12px 0">' +
+    '<h3>1:1:2:4 피라미드 물타기</h3>' +
+    '<p class="hint">단테 “눌림에서만, 4번까지” + 주식농사머신 “2차 채우면 목표가를 절반으로”. 금액만 넣으면 단계별로 나눌 금액이 나와.</p>' +
+    '<div style="display:flex;gap:8px;align-items:center;margin:2px 0 2px">' +
+      '<span style="font-size:11.5px;color:var(--dim);flex:0 0 auto">1차 매수 금액</span>' +
+      '<input type="number" id="pyrAmt" step="100000" min="0" inputmode="numeric" value="' + pv.amt + '" aria-label="1차 매수 금액">' +
+      '<span style="font-size:11.5px;color:var(--dim)">원</span>' +
+    '</div>' +
+    '<table>' +
+      '<thead><tr><th>단계</th><th>배수</th><th>금액</th><th>기준가</th><th>수량</th></tr></thead>' +
+      '<tbody>' + c.st.map(cell).join("") + '</tbody>' +
+      '<tfoot><tr class="total"><td>합계<small>1+1+2+4</small></td><td>8배</td>' +
+        '<td id="pyrTot">' + won(c.total) + '원</td>' +
+        '<td><span>4차까지 평단</span><b id="pyrAvg">' + (c.avgAll == null ? "—" : won(c.avgAll) + '원') + '</b></td>' +
+        '<td id="pyrTotQ">' + (c.qAll ? fxInt(c.qAll) + '주' : "—") + '</td></tr></tfoot>' +
+    '</table>' +
+    '<div class="pyrgoal">' +
+      '<div><span>1차만 · 목표 +20.3%</span><b id="pyrT1a">' + won(c.p1 * 1.203) + '원</b><em>평단 ' + won(c.p1) + '원 기준</em></div>' +
+      '<div><span>1차만 · 목표 +30.3%</span><b id="pyrT1b">' + won(c.p1 * 1.303) + '원</b><em>1차 반씩 나눠 익절</em></div>' +
+      '<div><span>2차까지 · 목표 +10.3%</span><b id="pyrT2a">' + (c.avg2 == null ? "—" : won(c.avg2 * 1.103) + '원') + '</b><em id="pyrT2aLab">' + (c.avg2 == null ? "평단 없음" : '평단 ' + won(c.avg2) + '원 기준') + '</em></div>' +
+      '<div><span>2차까지 · 목표 +20.3%</span><b id="pyrT2b">' + (c.avg2 == null ? "—" : won(c.avg2 * 1.203) + '원') + '</b><em>목표가를 절반으로 낮춤</em></div>' +
+    '</div>' +
+    '<label class="pyrchk' + (pv.c1 ? ' on' : '') + '" id="pyrCk1"><input type="checkbox" data-pyr="c1"' + (pv.c1 ? ' checked' : '') + '>' +
+      '<span><b>① 직전 매수가 대비 -15~-20% 이상 하락</b>단테 추가 매수 조건 1 · 안 밀렸으면 2차는 아직이야</span></label>' +
+    '<label class="pyrchk' + (pv.c2 ? ' on' : '') + '" id="pyrCk2"><input type="checkbox" data-pyr="c2"' + (pv.c2 ? ' checked' : '') + '>' +
+      '<span><b>② 오늘 종가가 첫 양봉(하락 브레이크)</b>떨어지는 칼날을 잡지 않기 위한 조건 2</span></label>' +
+    '<div class="pyrgo' + ((pv.c1 && pv.c2) ? ' ok' : '') + '" id="pyrGo">' + ((pv.c1 && pv.c2)
+      ? '✅ 추가 매수 조건 충족 — 2차(1차와 같은 금액)로 들어가고, 목표가는 절반(+10.3% / +20.3%)으로 낮춰.'
+      : '아직 추가 매수 조건은 아니야 — 두 조건이 모두 ✓ 되어야 2차를 넣어.') + '</div>' +
+    '<div class="note">피라미드는 <b>1차가 -15~-20% 밀리고 첫 양봉이 나온 날</b>에만. 4차(4배)까지 다 하고 나면 추가 매수는 없어. -7% 손절 원칙은 그대로야 — 물타기하다가 개별주를 무한으로 끌어안으면 안 돼.</div>' +
+    '<p class="hint" style="margin:8px 2px 0">기준가는 1차 ' + won(c.p1) + '원 · 2차 ' + won(c.st[1].p) + '원 · 3차 ' + won(c.st[2].p) + '원 · 4차 ' + won(c.st[3].p) + '원(3차 -15%). 시트의 분할 매수 자리를 그대로 썼고, 수량은 금액÷기준가야.</p>' +
+  '</div>';
+}
+function pyrUpdate() {
+  const r = pyrRow;
+  if (!r) return;
+  const inp = document.getElementById("pyrAmt");
+  if (!inp) return;
+  const amt = Math.max(0, num(inp.value) || 0);
+  const c = pyrCalc(r, amt);
+  const key = r.code || r.name;
+  pyrSet(key, { amt: amt || 500000 });
+  const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  c.st.forEach(s => {
+    setT("pyrA" + s.n, won(s.a) + "원");
+    setT("pyrQ" + s.n, s.q == null ? "—" : fxInt(s.q) + "주");
+  });
+  setT("pyrTot", won(c.total) + "원");
+  setT("pyrAvg", c.avgAll == null ? "—" : won(c.avgAll) + "원");
+  setT("pyrTotQ", c.qAll ? fxInt(c.qAll) + "주" : "—");
+  setT("pyrT1a", c.p1 == null ? "—" : won(c.p1 * 1.203) + "원");
+  setT("pyrT1b", c.p1 == null ? "—" : won(c.p1 * 1.303) + "원");
+  setT("pyrT2a", c.avg2 == null ? "—" : won(c.avg2 * 1.103) + "원");
+  setT("pyrT2b", c.avg2 == null ? "—" : won(c.avg2 * 1.203) + "원");
+  setT("pyrT2aLab", c.avg2 == null ? "평단 없음" : "평단 " + won(c.avg2) + "원 기준");
+  const pv = pyrOf(key);
+  const go = document.getElementById("pyrGo");
+  if (go) {
+    go.classList.toggle("ok", !!(pv.c1 && pv.c2));
+    go.textContent = (pv.c1 && pv.c2)
+      ? "✅ 추가 매수 조건 충족 — 2차(1차와 같은 금액)로 들어가고, 목표가는 절반(+10.3% / +20.3%)으로 낮춰."
+      : "아직 추가 매수 조건은 아니야 — 두 조건이 모두 ✓ 되어야 2차를 넣어.";
+  }
+  $$("#pyrCard .pyrchk").forEach(el => {
+    const k = $("input", el);
+    el.classList.toggle("on", !!(k && k.checked));
+  });
+}
 function openDetail(key) {
   const r = findRow(key);
   if (!r) return;
@@ -2197,6 +2394,7 @@ function openDetail(key) {
     fundCardHTML(r, m) +
     safeCardHTML(r, f) +
     signalCardHTML(r) +
+    pyrCardHTML(r) +
     '<div class="card" style="margin:12px 0">' +
       '<h3>분할 매수 · 손절</h3>' +
       '<p class="hint">1차는 지금, 2·3차는 세 선이 겹치는 자리. 손절은 224선 -7% 기준.</p>' +
@@ -2227,6 +2425,9 @@ function openDetail(key) {
         '<div><span>연속배당</span><b>' + esc(r.years || "—") + '</b></div>' +
         '<div><span>시트 점수·등급</span><b>' + (r.score == null ? "—" : r.score + "점") + ' · ' + esc(r.grade || "—") + '</b></div>' +
         '<div><span>흑자</span><b>' + (r.surplus === null ? "—" : r.surplus ? "Y" : "N") + '</b></div>' +
+        '<div><span>업종</span><b>' + (sectorOf(r) ? esc(sectorOf(r)) : "미확인") + '</b></div>' +
+        '<div><span>52주 최지가 대비</span><b class="' + (low52Flag(r) ? "down" : "") + '">' + (r.low52 == null ? "—" : pct(r.low52, 1)) + (low52Flag(r) ? ' · 주의' : '') + '</b></div>' +
+        '<div><span>증거금</span><b>' + (marginFlag(r) === "100" ? "⚠️ 증거금 100% (현금만)" : marginFlag(r) === "credit" ? '신용가능 ' + esc(String(r.margin).replace(/^신용가능\s*/, "")) : "미확인") + '</b></div>' +
       '</div>' +
       (r.accDetail ? '<p class="hint" style="margin:10px 0 0">' + esc(r.accDetail) + '</p>' : "") +
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
@@ -2407,6 +2608,11 @@ function renderJournal() {
     '<div class="stat"><span>매도 승/패</span><b>' + ts.wins + ' / ' + ts.losses + (ts.avgDays != null ? '<small>' + ts.avgDays + '일 보유</small>' : '') + '</b></div>';
 
   const list = state.journal.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.id - a.id));
+  const jw = $("#sectorWarnJournal");
+  if (jw) {
+    const heldRows = hs.map(h => findRow(h.code || h.name)).filter(Boolean);
+    jw.innerHTML = heldRows.length ? sectorWarnHTML(heldRows, "지금 보유 중인 종목 기준 · 같은 업종이면 한 종목만 남기는 걸 고려해") : "";
+  }
   $("#jCount").textContent = list.length ? list.length + "건 기록 · 최근 " + (list[0].date || "") : "아직 기록이 없어.";
   if (!list.length) {
     $("#jList").innerHTML = '<div class="empty">첫 매매를 남겨봐.<br>가격·수량·손절선, 그리고 산 이유 한 줄.</div>';
@@ -2704,12 +2910,22 @@ $("#sortSel").addEventListener("change", (e) => {
 // 저수지 계산기 — 입력할 때마다 저장하고 결과만 다시 계산
 document.addEventListener("input", (e) => {
   const t = e.target;
+  if (t && t.id === "pyrAmt") { pyrUpdate(); return; }
   if (!t || (t.id !== "poolTotal" && t.id !== "poolIn")) return;
   const v = num(t.value) || 0;
   if (t.id === "poolTotal") state.pool.total = v; else state.pool.invested = v;
   store.set(LS.pool, state.pool);
   const res = document.getElementById("poolRes");
   if (res) res.innerHTML = poolResultHTML();
+});
+
+// 피라미드 체크리스트(①눌림 ②첫 양봉) 토글
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!t || !t.dataset || !t.dataset.pyr) return;
+  if (!pyrRow) return;
+  pyrSet(pyrRow.code || pyrRow.name, { [t.dataset.pyr]: !!t.checked });
+  pyrUpdate();
 });
 
 // 매매일지 저장
