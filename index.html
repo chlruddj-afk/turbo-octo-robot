@@ -2367,6 +2367,9 @@ function render3M() {
   const tone = wr >= 60 ? "" : wr >= 40 ? "mid" : "low";
   const failTags = tags.filter(t => t[0] !== TAG_GOOD);
   const worst = failTags[0];
+  const worstPhrase = worst ? (worst[1] >= 2
+    ? "가장 많이 붙은 태그가 “" + esc(worst[0]) + "”(" + worst[1] + "회) — 이 패턴 하나만 피해도 결과가 달라져."
+    : "실패 태그로 “" + esc(worst[0]) + "”가 붙었어 — 이 패턴만 피해도 결과가 달라져.") : "실패한 매매에 태그를 달아 패턴을 찾아봐.";
   el.innerHTML = '<h3>최근 3개월 복기</h3>' +
     '<p class="hint">' + esc(w.cutoff) + ' 이후 매도 ' + w.closed + '건 기준 · 김종봉은 실패한 매매 위주로 3개월 단위 승률을 봐</p>' +
     '<div class="wr3" style="margin-top:6px">' +
@@ -2384,9 +2387,8 @@ function render3M() {
     '<div class="note">' + (wr >= 60
       ? '3개월 승률 ' + wr + '%면 지금 템포는 지킬 만해. 다만 이익 폭보다 손실 폭이 크면 승률이 높아도 계좌는 줄어 — 평균 손실이 평균 이익의 1/2을 넘지 않는지 봐.'
       : wr >= 40
-        ? '3개월 승률 ' + wr + '%는 반타작 근처야. ' + (worst ? '가장 많이 붙은 태그가 “' + esc(worst[0]) + '”(' + worst[1] + '회) — 이 패턴 하나만 피해도 결과가 달라져.' : '실패한 매매에 태그를 달아 패턴을 찾아봐.')
-        : '3개월 승률 ' + wr + '%면 손실이 더 많은 구간이야. 1차 비중을 줄이고, 손절선 먼저 정하고 들어가는 것부터 다시 잡자.' +
-          (worst ? ' 가장 잦은 실패 태그는 “' + esc(worst[0]) + '”(' + worst[1] + '회).' : '')) + '</div>';
+        ? '3개월 승률 ' + wr + '%는 반타작 근처야. ' + worstPhrase
+        : '3개월 승률 ' + wr + '%면 손실이 더 많은 구간이야. 1차 비중을 줄이고, 손절선 먼저 정하고 들어가는 것부터 다시 잡자. ' + worstPhrase) + '</div>';
 }
 
 /* ══════════ 매매일지 렌더 ══════════ */
