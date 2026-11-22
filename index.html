@@ -1193,6 +1193,7 @@ function mountChart(r) {
   chartState.row = r;
   chartState.code = chartCode(r.code);
   chartState.data = barsFor(r);
+  chartState.guide = { buy1: r.buy1, buy2: r.buy2, stop: r.stop, price: r.price };
   chartState.hover = null;
   chartState.geom = null;
   if (!cv || !chartState.data || !chartState.data.length) return;
@@ -1344,8 +1345,8 @@ function drawChart() {
   });
 
   /* 세력선 */
-  const drawMA = (key, color, width) => {
-    if (!on[key]) return;
+  const drawMA = (key, flag, color, width) => {
+    if (!on[flag]) return;
     ctx.strokeStyle = color;
     ctx.lineWidth = width;
     ctx.lineJoin = "round";
@@ -1360,9 +1361,9 @@ function drawChart() {
     });
     ctx.stroke();
   };
-  drawMA("m448", CHART_MA.ma448.c, 1.6);
-  drawMA("m112", CHART_MA.ma112.c, 1.8);
-  drawMA("m224", CHART_MA.ma224.c, 2.8);
+  drawMA("m448", "ma448", CHART_MA.ma448.c, 1.6);
+  drawMA("m112", "ma112", CHART_MA.ma112.c, 1.8);
+  drawMA("m224", "ma224", CHART_MA.ma224.c, 2.8);
 
   /* 매수·손절 가이드 점선 + 우측 라벨 */
   if (on.guide) {
