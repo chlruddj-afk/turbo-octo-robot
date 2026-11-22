@@ -2230,13 +2230,13 @@ function pyrSet(key, patch) {
 function pyrCalc(r, amt) {
   const a = Number(amt) > 0 ? Number(amt) : 0;
   const p1 = r.buy1 || r.price || null;
-  const p2 = r.buy2 || (p1 ? Math.round(p1 * 0.93) : null);
-  const p3 = r.buy3 || (p2 ? Math.round(p2 * 0.96) : null);
+  const p2 = p1 ? Math.round(p1 * 0.85) : null;
+  const p3 = p2 ? Math.round(p2 * 0.85) : null;
   const p4 = p3 ? Math.round(p3 * 0.85) : null;
   const st = [
-    { n: 1, w: 1, p: p1, tag: "현재가 상차" },
-    { n: 2, w: 1, p: p2, tag: "112·448선" },
-    { n: 3, w: 2, p: p3, tag: "224선" },
+    { n: 1, w: 1, p: p1, tag: "현재가·1차 매수" },
+    { n: 2, w: 1, p: p2, tag: "1차 -15%" },
+    { n: 3, w: 2, p: p3, tag: "2차 -15%" },
     { n: 4, w: 4, p: p4, tag: "3차 -15%" }
   ];
   st.forEach(s => { s.a = a * s.w; s.q = s.p ? s.a / s.p : null; });
@@ -2258,7 +2258,7 @@ function pyrCardHTML(r) {
   }
   const cell = (s) => '<tr><td>' + s.n + '차<small>' + esc(s.tag) + '</small></td><td>' + s.w + '배</td>' +
     '<td id="pyrA' + s.n + '">' + won(s.a) + '원</td>' +
-    '<td>' + won(s.p) + '원<small id="pyrP' + s.n + '">-</small></td>' +
+    '<td>' + won(s.p) + '원</td>' +
     '<td id="pyrQ' + s.n + '">' + (s.q == null ? "—" : fxInt(s.q) + '주') + '</td></tr>';
   return '<div class="card pyr" id="pyrCard" style="margin:12px 0">' +
     '<h3>1:1:2:4 피라미드 물타기</h3>' +
@@ -2290,7 +2290,7 @@ function pyrCardHTML(r) {
       ? '✅ 추가 매수 조건 충족 — 2차(1차와 같은 금액)로 들어가고, 목표가는 절반(+10.3% / +20.3%)으로 낮춰.'
       : '아직 추가 매수 조건은 아니야 — 두 조건이 모두 ✓ 되어야 2차를 넣어.') + '</div>' +
     '<div class="note">피라미드는 <b>1차가 -15~-20% 밀리고 첫 양봉이 나온 날</b>에만. 4차(4배)까지 다 하고 나면 추가 매수는 없어. -7% 손절 원칙은 그대로야 — 물타기하다가 개별주를 무한으로 끌어안으면 안 돼.</div>' +
-    '<p class="hint" style="margin:8px 2px 0">기준가는 1차 ' + won(c.p1) + '원 · 2차 ' + won(c.st[1].p) + '원 · 3차 ' + won(c.st[2].p) + '원 · 4차 ' + won(c.st[3].p) + '원(3차 -15%). 시트의 분할 매수 자리를 그대로 썼고, 수량은 금액÷기준가야.</p>' +
+    '<p class="hint" style="margin:8px 2px 0">기준가는 단테식으로 1차 ' + won(c.p1) + '원에서 직전 단계마다 -15%씩 내려잡았어(2차 ' + won(c.st[1].p) + ' · 3차 ' + won(c.st[2].p) + ' · 4차 ' + won(c.st[3].p) + '원). 시트의 세력선 자리(2차 ' + won(r.buy2) + ' · 3차 ' + won(r.buy3) + '원)는 더 얕으니, 그 자리에서 넣으면 평단이 조금 더 높아져 — 조건이 먼저 맞는 쪽을 따라.</p>' +
   '</div>';
 }
 function pyrUpdate() {
@@ -2426,7 +2426,7 @@ function openDetail(key) {
         '<div><span>시트 점수·등급</span><b>' + (r.score == null ? "—" : r.score + "점") + ' · ' + esc(r.grade || "—") + '</b></div>' +
         '<div><span>흑자</span><b>' + (r.surplus === null ? "—" : r.surplus ? "Y" : "N") + '</b></div>' +
         '<div><span>업종</span><b>' + (sectorOf(r) ? esc(sectorOf(r)) : "미확인") + '</b></div>' +
-        '<div><span>52주 최지가 대비</span><b class="' + (low52Flag(r) ? "down" : "") + '">' + (r.low52 == null ? "—" : pct(r.low52, 1)) + (low52Flag(r) ? ' · 주의' : '') + '</b></div>' +
+        '<div><span>52주 최저가 대비</span><b class="' + (low52Flag(r) ? "down" : "") + '">' + (r.low52 == null ? "—" : pct(r.low52, 1)) + (low52Flag(r) ? ' · 주의' : '') + '</b></div>' +
         '<div><span>증거금</span><b>' + (marginFlag(r) === "100" ? "⚠️ 증거금 100% (현금만)" : marginFlag(r) === "credit" ? '신용가능 ' + esc(String(r.margin).replace(/^신용가능\s*/, "")) : "미확인") + '</b></div>' +
       '</div>' +
       (r.accDetail ? '<p class="hint" style="margin:10px 0 0">' + esc(r.accDetail) + '</p>' : "") +
