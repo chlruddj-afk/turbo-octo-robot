@@ -413,6 +413,32 @@ table.t tr:last-child td{border-bottom:none}
 .rsbox span{display:block;font-size:9.5px;color:var(--dim)}
 .rsbox b{display:block;font-size:15px;margin-top:2px;letter-spacing:-0.02em}
 .rsbox em{font-style:normal;font-size:10px;color:var(--muted)}
+
+/* ── v1.5.0 눌림 거래량 · 경고 · 재무 안정성 · 복기 태그 ── */
+.sigrow{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.sig{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:4px 8px;border-radius:8px;letter-spacing:-0.01em;line-height:1.3}
+.sig.ok{background:rgba(49,208,170,.13);color:var(--teal)}
+.sig.mid{background:rgba(240,180,41,.13);color:var(--amber)}
+.sig.bad{background:rgba(244,98,106,.14);color:#ff9aa1}
+.sig.off{background:#1a2539;color:var(--dim)}
+.chk3{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.chk3 .c3{display:flex;align-items:center;gap:9px;background:#0f1828;border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.chk3 .c3.pass{border-color:rgba(49,208,170,.3)}
+.chk3 .c3.fail{border-color:rgba(244,98,106,.3)}
+.chk3 .c3 .ic{flex:0 0 16px;text-align:center;font-size:12px}
+.chk3 .c3 .tx{flex:1;min-width:0}
+.chk3 .c3 .tx b{display:block;font-size:12px}
+.chk3 .c3 .tx span{display:block;font-size:10px;color:var(--dim);margin-top:1px;line-height:1.35}
+.chk3 .c3 .vv{font-size:12px;font-weight:800;white-space:nowrap;letter-spacing:-0.02em}
+.jtagchips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 0}
+.jtagchips button{border:1px solid var(--line);background:#0d1626;border-radius:999px;padding:7px 11px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.jtagchips button.on{background:rgba(49,208,170,.14);border-color:rgba(49,208,170,.5);color:var(--teal)}
+.jtagchips button.on.bad{background:rgba(244,98,106,.13);border-color:rgba(244,98,106,.45);color:#ff9aa1}
+.jtag{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;background:#1a2539;color:var(--muted);margin:4px 4px 0 0}
+.jtag.bad{background:rgba(244,98,106,.13);color:#ff9aa1}
+.jtag.good{background:rgba(49,208,170,.13);color:var(--teal)}
+.jreview{font-size:11.5px;color:#b9cbea;margin-top:5px;padding-left:8px;border-left:2px solid rgba(91,156,255,.45)}
+.wr3{display:flex;gap:14px;align-items:center}
 </style>
 </head>
 <body>
@@ -481,6 +507,9 @@ table.t tr:last-child td{border-bottom:none}
         <div class="grow"><b>부채비율</b><span>빚 비율</span><i>100% 아래면 탄탄, 200% 넘으면 주의</i></div>
         <div class="grow"><b>시가총액</b><span>회사 덩치</span><i>회사 덩치. 클수록 하루 흔들림이 작아</i></div>
         <div class="grow"><b>RS</b><span>상대강도</span><i>같은 기간 코스피보다 더 오르거나 덜 빠진 정도. 60점 이상이면 강함</i></div>
+        <div class="grow"><b>유보율</b><span>사내 유보금</span><i>자본금 대비 쌓아둔 유보금. 300% 이상이면 배당·위기에 쓸 여유가 있다는 뜻</i></div>
+        <div class="grow"><b>최대주주</b><span>지분율</span><i>최대주주+특수관계인 지분. 30% 이상이면 경영권이 안정적</i></div>
+        <div class="grow"><b>눌림 거래량</b><span>김정수</span><i>매집봉 뒤 거래량이 1/3 이하로 말라면 세력이 안 빠졌다는 신호</i></div>
         <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10.<br>총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 + RS 보정(±10). 위 카드에서 세력선·기업체력 점수를 나란히 보면 “차트는 좋은데 재무가 어떤지” 한눈에 보여.<br>나가는 기준은 1차 +20%에서 절반 익절, -7%나 224선 이탈이면 교체.</p>
       </div>
     </section>
@@ -492,6 +521,7 @@ table.t tr:last-child td{border-bottom:none}
         <p>산 이유와 손절선을 같이 남겨야 복기가 된다</p>
       </div>
       <div class="stat-grid" id="jSummary"></div>
+      <div class="card" id="j3m"></div>
 
       <div class="card">
         <h3 id="jFormTitle">매매 기록</h3>
@@ -509,6 +539,17 @@ table.t tr:last-child td{border-bottom:none}
             <label class="f">손절가(원)<input type="number" id="jStop" inputmode="numeric" placeholder="17640"></label>
             <label class="f">종목코드<input type="text" id="jCode" inputmode="numeric" placeholder="선택"></label>
             <label class="f full">근거 메모<textarea id="jNote" rows="2" placeholder="수렴 1.3%, 11/18 매집봉 10.9배. 224선 -7% 손절."></textarea></label>
+            <div class="full">
+              <label class="f" style="margin-bottom:5px">복기 태그 (해당되는 것 모두)</label>
+              <div class="jtagchips" id="jTags">
+                <button type="button" class="bad" data-jtag="손절 미준수">손절 미준수</button>
+                <button type="button" class="bad" data-jtag="추격 매수">추격 매수</button>
+                <button type="button" class="bad" data-jtag="윗꼬리 음봉 진입">윗꼬리 음봉 진입</button>
+                <button type="button" class="bad" data-jtag="조기 익절">조기 익절</button>
+                <button type="button" data-jtag="원칙 준수">원칙 준수</button>
+              </div>
+            </div>
+            <label class="f full">한 줄 복기<textarea id="jReview" rows="2" placeholder="다음엔 윗꼬리 음봉 다음 날은 안 사기. 224선까지는 들고 가기."></textarea></label>
           </div>
           <div class="row">
             <button class="btn primary" type="submit" id="jSubmit">기록 저장</button>
@@ -567,7 +608,7 @@ table.t tr:last-child td{border-bottom:none}
 
       <div class="card">
         <h3>표 붙여넣기</h3>
-        <p class="hint">시트나 엑셀에서 복사한 표를 그대로 붙여넣어. 콤마·탭 둘 다 인식하고, 30열(RS 포함)이나 예전 27열·22열·10열 형식도 돼. PER·PBR·ROE·부채비율·시가총액 열이 있으면 기업 체력 점수도, RS 열이 있으면 상대강도도 같이 계산해.</p>
+        <p class="hint">시트나 엑셀에서 복사한 표를 그대로 붙여넣어. 콤마·탭 둘 다 인식하고, 34열(유보율·최대주주·눌림거래량·경고 포함)이나 예전 30열·27열·22열·10열 형식도 돼. PER·PBR·ROE·부채비율·시가총액 열이 있으면 기업 체력 점수도, RS 열이 있으면 상대강도도 같이 계산해.</p>
         <textarea id="pasteBox" rows="5" placeholder="종목명,종목코드,현재가,112일선,224일선,448일선,수렴도(%),매집봉(Y/N),매집봉상세,배당률(%),연속배당,흑자(Y/N),위험(Y/N),점수,등급,1차매수,2차매수,3차매수,손절가,한줄근거,PER,PBR,ROE,부채비율,시가총액(억)"></textarea>
         <div class="row">
           <button class="btn ghost" type="button" data-act="pastePreview">미리보기</button>
@@ -658,7 +699,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const LS = {
   cache:  "dante.reco.cache.v1",
@@ -704,6 +745,17 @@ const FUND_TREND = {
   "054950": [262, 288, 284],
   "009160": [-65, 186, 224],
   "011200": [9687, 37821, 18787]
+};
+
+/* ── 김종봉 재무 안정성(유보율·최대주주) + 김정수 눌림·경고 기본값(시트 AE~AH열, 2026-11-23 조회) ── */
+const SIGNAL_SEED = {
+  "122900": { reserve:2029.96, major:43.11, pullVol:10.5, warnText:"" },
+  "005500": { reserve:2153.20, major:13.41, pullVol:30.4, warnText:"장대음봉 주의" },
+  "032640": { reserve:246.54,  major:38.75, pullVol:19.4, warnText:"윗꼬리 음봉 주의" },
+  "016580": { reserve:4233.71, major:23.28, pullVol:39.2, warnText:"" },
+  "054950": { reserve:3806.76, major:39.19, pullVol:35.0, warnText:"" },
+  "009160": { reserve:3170.37, major:61.72, pullVol:20.4, warnText:"" },
+  "011200": { reserve:346.56,  major:35.42, pullVol:17.3, warnText:"" }
 };
 
 /* ── 상태 ── */
@@ -791,6 +843,10 @@ const nk = s => String(s == null ? "" : s).replace(/\s+/g, "").toLowerCase();
 
 const FIELD_RULES = [
   ["accDetail", h => h.indexOf("매집봉상세") === 0 || h.indexOf("매집상세") === 0],
+  ["warnText",  h => h.indexOf("위험경고") === 0 || h === "경고" || h.indexOf("경고") === 0],
+  ["reserve",   h => h.indexOf("유보율") === 0],
+  ["major",     h => h.indexOf("최대주주") === 0],
+  ["pullVol",   h => h.indexOf("눌림거래량") === 0 || (h.indexOf("눌림") === 0 && h.indexOf("거래량") >= 0)],
   ["base",      h => h.indexOf("기준일") === 0],
   ["rank",      h => h === "순위" || h === "rank" || h === "no"],
   ["name",      h => h === "종목명" || h === "종목" || h === "name"],
@@ -804,7 +860,7 @@ const FIELD_RULES = [
   ["div",       h => h.indexOf("배당률") === 0 || h === "배당" || h === "배당수익률(%)"],
   ["years",     h => h.indexOf("연속배당") === 0 || h === "배당연수"],
   ["surplus",   h => h.indexOf("흑자") >= 0],
-  ["risk",      h => h.indexOf("위험") === 0],
+  ["risk",      h => h.indexOf("위험") === 0 && h.indexOf("경고") < 0],
   ["score",     h => h.indexOf("점수") >= 0],
   ["grade",     h => h === "등급" || h === "grade"],
   ["buy1",      h => h.indexOf("1차") === 0],
@@ -901,6 +957,8 @@ function normRow(o) {
     per: num(o.per), pbr: num(o.pbr), roe: num(o.roe), debt: num(o.debt), mcap: num(o.mcap),
     rs20: num(o.rs20), rs60: num(o.rs60), rsGrade: String(o.rsGrade == null ? "" : o.rsGrade).trim(),
     note: String(o.note == null ? "" : o.note).trim(),
+    reserve: num(o.reserve), major: num(o.major), pullVol: num(o.pullVol),
+    warnText: (/^(없음|-|n\/?a)$/i.test(String(o.warnText == null ? "" : o.warnText).trim()) ? "" : String(o.warnText == null ? "" : o.warnText).trim()),
     src: "sheet"
   };
 }
@@ -980,6 +1038,42 @@ function debtBadge(v) {
   if (v <= 100) return { t: "탄탄", c: "teal" };
   if (v <= 200) return { t: "주의", c: "amber" };
   return { t: "위험", c: "red" };
+}
+/* ── 김종봉 재무 안정성 배지: 유보율 · 최대주주 지분 ── */
+function reserveBadge(v) {
+  if (v == null) return { t: "자료없음", c: "gray" };
+  if (v < 0) return { t: "결손", c: "red" };
+  if (v >= 300) return { t: "유보 충분", c: "teal" };
+  if (v >= 100) return { t: "유보 보통", c: "blue" };
+  return { t: "유보 부족", c: "amber" };
+}
+function majorBadge(v) {
+  if (v == null) return { t: "자료없음", c: "gray" };
+  if (v >= 30) return { t: "지배력 안정", c: "teal" };
+  if (v >= 20) return { t: "지배력 보통", c: "blue" };
+  if (v >= 15) return { t: "지배력 약함", c: "amber" };
+  return { t: "지배력 취약", c: "red" };
+}
+/* ── 김정수 눌림 거래량 · 경고 신호 ── */
+function pullBadge(v) {
+  if (v == null) return { ico: "·", t: "눌림 자료 없음", c: "gray" };
+  if (v <= 33) return { ico: "🟢", t: "눌림 거래량 급감", c: "teal" };
+  if (v <= 60) return { ico: "🟡", t: "눌림 거래량 보통", c: "amber" };
+  return { ico: "🔴", t: "거래량 살아있음", c: "red" };
+}
+function warnList(r) {
+  const t = String((r && r.warnText) || "").trim();
+  if (!t || t === "없음" || t === "-") return [];
+  return t.split(/[·,]/).map(s => s.trim()).filter(Boolean);
+}
+function sigHTML(r) {
+  const p = pullBadge(r.pullVol);
+  const cls = (c) => c === "teal" ? "ok" : c === "amber" ? "mid" : c === "red" ? "bad" : "off";
+  let out = '<span class="sig ' + cls(p.c) + '">' + p.ico + ' ' + esc(p.t) + (r.pullVol == null ? "" : ' ' + fx(r.pullVol, 1) + '%') + '</span>';
+  const w = warnList(r);
+  if (!w.length) out += '<span class="sig ok">✅ 경고 없음</span>';
+  else out += '<span class="sig ' + (w.some(x => /장대음봉|2배/.test(x)) ? "bad" : "mid") + '">⚠️ ' + esc(w.join(" · ")) + '</span>';
+  return out;
 }
 /* 최근 3년 연속 흑자 연수 — 시트에 이력이 없으면 흑자(Y/N)로 대신 */
 function profitYears(r) {
@@ -1135,7 +1229,7 @@ function fundComment(r, f, m) {
 /* ══════════ 행 접근 ══════════ */
 function baseRows() {
   if (state.sheet.rows && state.sheet.rows.length) return state.sheet.rows;
-  return SEED.map(r => ({ ...FUND_SEED[r.code], ...r, src: "seed" }));
+  return SEED.map(r => ({ ...FUND_SEED[r.code], ...SIGNAL_SEED[r.code], ...r, src: "seed" }));
 }
 function allRows() {
   const cust = state.custom.rows || [];
@@ -1812,6 +1906,7 @@ function cardHTML(r, pos) {
       (r.rs60 != null ? '<span>60일 <b>' + pct(r.rs60, 1) + 'p</b></span>' : '') +
       (o.rs != null ? '<span>RS 점수 <b>' + o.rs + '</b> · 총매력도 보정 <b>' + (o.rsAdj > 0 ? '+' : '') + o.rsAdj + '</b></span>' : '') +
     '</div>' +
+    '<div class="sigrow">' + sigHTML(r) + '</div>' +
     '<div class="tscore">' +
       '<div class="tgauge ' + gaugeClass(t) + '" style="--p:' + t + '"><span><b>' + t + '</b><small>총 매력도</small></span></div>' +
       '<div class="tbars">' +
@@ -1936,6 +2031,8 @@ function fundCardHTML(r, m) {
     metricRow("PBR", "주가순자산비율", f.pbr == null ? "—" : fx(f.pbr, 2) + "배", f.pbrB, "회사 재산 대비 주가. 1배 아래면 재산보다 싸게 거래") +
     metricRow("ROE", "자기자본이익률", f.roe == null ? "—" : fx(f.roe, 2) + "%", f.roeB, "내 돈 굴려 얼마나 벌었나. 10% 이상이면 알짜") +
     metricRow("부채비율", "빚 비율", f.debt == null ? "—" : fx(f.debt, 1) + "%", f.debtB, "100% 아래면 탄탄, 200% 넘으면 주의") +
+    metricRow("유보율", "사내 유보금", r.reserve == null ? "—" : fx(r.reserve, 0) + "%", reserveBadge(r.reserve), "자본금 대비 쌓아둔 유보금. 300%를 넘으면 배당·위기에 쓸 여유가 있다는 뜻") +
+    metricRow("최대주주", "지분율(특수관계인 포함)", r.major == null ? "—" : fx(r.major, 2) + "%", majorBadge(r.major), "최대주주 쪽 지분. 30% 이상이면 경영권이 안정적") +
     metricRow("시가총액", "회사 덩치", capText(f.mcap), { t: capSize(f.mcap) || "—", c: f.mcap == null ? "gray" : "blue" }, "주가 × 상장주식수. 덩치가 클수록 하루 흔들림이 작아");
   let trendHTML = "";
   if (tr && tr.length) {
@@ -1962,7 +2059,75 @@ function fundCardHTML(r, m) {
     trendHTML +
     '<div class="note">' + esc(fundComment(r, f, m)) + '</div>' +
     '<p class="hint" style="margin:10px 2px 0">점수 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. ' +
-      'PER·PBR은 최근 분기 실적(TTM), ROE·부채비율은 2025 사업연도 결산 기준(2026-11-22 네이버금융 조회)이야.</p>' +
+      'PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회)이야. ' +
+      '유보율·최대주주 지분은 점수에 넣지 않고 체크리스트로만 보여줘 — 종목끼리 점수를 비교할 때 기준이 흔들리지 않게 하려는 거야.</p>' +
+  '</div>';
+}
+/* ══════════ 김종봉 재무 안정성 3원칙 체크리스트 ══════════ */
+function safeCardHTML(r, f) {
+  const items = [
+    { ok: f.debt != null && f.debt <= 100, name: "부채비율 100% 이하",
+      v: f.debt == null ? "—" : fx(f.debt, 1) + "%",
+      d: "빚이 자기자본보다 많으면 금리가 오를 때 흔들려" },
+    { ok: r.reserve != null && r.reserve >= 300, name: "유보율 충분(300% 이상)",
+      v: r.reserve == null ? "—" : fx(r.reserve, 0) + "%",
+      d: "자본금보다 유보금이 두세 배는 쌓여 있어야 배당도, 위기도 버터" },
+    { ok: r.major != null && r.major >= 30, name: "최대주주 지분 확실(30% 이상)",
+      v: r.major == null ? "—" : fx(r.major, 2) + "%",
+      d: "지배력이 흔들리면 회사가 엉뚱한 방향으로 갈 수 있어" }
+  ];
+  const pass = items.filter(i => i.ok).length;
+  const tone = pass === 3 ? "good" : pass === 2 ? "info" : "warn";
+  const verdict = pass === 3 ? "세 가지 다 통과 — 재무는 걱정 없어"
+    : pass === 2 ? "2개 통과 · 약한 항목만 기억하고 비중을 조절해"
+    : pass === 1 ? "1개만 통과 — 재무 쪽은 보수적으로 봐야 해"
+    : "재무 3원칙을 거의 못 넘었어 — 관찰만 하자";
+  return '<div class="card" style="margin:12px 0">' +
+    '<h3>🛡️ 재무 안정성 체크 (김종봉 3원칙)</h3>' +
+    '<p class="hint">점수와 별개로, 사기 전에 눈으로 확인하는 세 가지야.</p>' +
+    '<div class="cmpv ' + tone + '">3개 중 ' + pass + '개 통과 — ' + esc(verdict) + '</div>' +
+    '<div class="chk3">' + items.map(i =>
+      '<div class="c3 ' + (i.ok ? "pass" : "fail") + '"><span class="ic">' + (i.ok ? "✅" : "⚠️") + '</span>' +
+      '<div class="tx"><b>' + esc(i.name) + '</b><span>' + esc(i.d) + '</span></div>' +
+      '<span class="vv" style="color:' + (i.ok ? "var(--teal)" : "var(--amber)") + '">' + esc(i.v) + '</span></div>').join("") +
+    '</div>' +
+    '<div class="note">유보율은 (잉여금 + 자본잉여금) ÷ 자본금 × 100이야. 100%면 자본금만큼 유보금이 있다는 뜻이고, 1,000%가 넘으면 웬만한 위기는 자체 자금으로 넘긴다는 뜻이지. 최대주주 지분은 본인 + 특수관계인 합계야.</div>' +
+  '</div>';
+}
+/* ══════════ 김정수 눌림 거래량 · 위험 경고 ══════════ */
+function warnComment(w) {
+  const out = [];
+  if (w.some(x => /장대음봉/.test(x))) out.push("거래량을 싣고 크게 밀린 날이 있었어. 물량이 나왔다는 뜻이라 추격 매수는 피하고 손절선을 짧게 잡아.");
+  if (w.some(x => /윗꼬리/.test(x))) out.push("위에서 매물에 막혀 꼬리를 길게 남겼어. 그 고점을 다시 넘어서기 전엔 비중을 늘리지 마.");
+  if (w.some(x => /2배/.test(x))) out.push("바닥에서 두 배 넘게 오른 자리야. 김정수 기준으로는 여기서부터가 추격 금지 구간이야.");
+  return out.join(" ") || "위험 봉이 잡혔어. 한 번 더 확인하고 들어가자.";
+}
+function signalCardHTML(r) {
+  const p = pullBadge(r.pullVol);
+  const w = warnList(r);
+  const pullNote = r.pullVol == null
+    ? "차트데이터에서 매집봉을 못 찾아 계산하지 못했어."
+    : r.pullVol <= 33
+      ? "매집봉 대비 " + fx(r.pullVol, 1) + "%로 거래량이 1/3 아래로 말랐어. 세력이 아직 안 빠졌다는 신호라 눌림에서 사는 자리야."
+      : r.pullVol <= 60
+        ? "매집봉 대비 " + fx(r.pullVol, 1) + "%. 절반 아래로 줄었지만 1/3까지는 아니야. 한 번 더 말라주면 더 좋아."
+        : "매집봉 대비 " + fx(r.pullVol, 1) + "%. 거래량이 별로 안 줄었어 — 세력이 팔고 있는 건 아닌지 의심해봐.";
+  const warnBlock = w.length
+    ? '<div class="note warn">⚠️ ' + esc(w.join(" · ")) + ' — ' + esc(warnComment(w)) + '</div>'
+    : '<div class="note">✅ 최근 10거래일 안에 고거래량 장대음봉이나 긴 윗꼬리 음봉이 없었고, 바닥 대비 2배 오른 자리도 아니야.</div>';
+  return '<div class="card" style="margin:12px 0">' +
+    '<h3>🌾 눌림 거래량 · 위험 경고 (김정수)</h3>' +
+    '<p class="hint">매집봉 뒤에 거래량이 얼마나 말랐는지, 최근에 위험한 봉이 나왔는지.</p>' +
+    '<div class="sigrow">' + sigHTML(r) + '</div>' +
+    '<div class="kv" style="margin-top:12px">' +
+      '<div><span>눌림 거래량 비율</span><b>' + (r.pullVol == null ? "—" : fx(r.pullVol, 1) + "%") + '</b></div>' +
+      '<div><span>판정</span><b style="color:' + (p.c === "teal" ? "var(--teal)" : p.c === "amber" ? "var(--amber)" : p.c === "red" ? "var(--red)" : "var(--dim)") + '">' + p.ico + ' ' + esc(p.t) + '</b></div>' +
+    '</div>' +
+    '<div class="note">' + esc(pullNote) + '</div>' +
+    warnBlock +
+    '<p class="hint" style="margin:10px 2px 0">눌림 거래량 비율 = 최근 30거래일 최대 매집봉(양봉 + 20일 평균 거래량 2배) 이후 최근 5거래일 평균 거래량 ÷ 매집봉 거래량. 33% 이하면 🟢 세력 미이탈. ' +
+      '경고는 ① 최근 120거래일 저가 대비 +100% 이상 ② 최근 10거래일 안 음봉 + 거래량 20일평균 2배 + 몸통 2% 이상 ③ 음봉의 윗꼬리가 몸통의 1.5배 이상이면서 종가의 2% 이상일 때 켜져. ' +
+      '기준일 ' + esc(r.base || currentBase() || "—") + ' 차트데이터 계산값이야.</p>' +
   '</div>';
 }
 function openDetail(key) {
@@ -2029,6 +2194,8 @@ function openDetail(key) {
     '</div>' +
     rsCardHTML(r) +
     fundCardHTML(r, m) +
+    safeCardHTML(r, f) +
+    signalCardHTML(r) +
     '<div class="card" style="margin:12px 0">' +
       '<h3>분할 매수 · 손절</h3>' +
       '<p class="hint">1차는 지금, 2·3차는 세 선이 겹치는 자리. 손절은 224선 -7% 기준.</p>' +
@@ -2131,6 +2298,95 @@ function tradeStats() {
   });
   return { wins, losses, realized, avgDays: days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : null, closed: wins + losses };
 }
+/* 최근 N일(기본 3개월) 승률·손익 — 김종봉: 실패한 매매 위주로 최소 3개월 단위 검증 */
+function ymdDaysAgo(n) {
+  const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - n);
+  const p = x => String(x).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+function tradeStatsWindow(days) {
+  const es = sortedJournal();
+  const cutoff = days == null ? null : ymdDaysAgo(days);
+  const pos = new Map();
+  let wins = 0, losses = 0, realized = 0, gains = 0, lossAmt = 0;
+  const pcts = [];
+  es.forEach(e => {
+    const k = e.code || e.name;
+    const p = pos.get(k) || { qty: 0, cost: 0 };
+    if (e.type === "buy") { p.qty += e.qty; p.cost += e.price * e.qty; }
+    else {
+      const avg = p.qty ? p.cost / p.qty : 0, q = Math.min(e.qty, p.qty);
+      const pnl = (e.price - avg) * q;
+      if (!cutoff || String(e.date || "") >= cutoff) {
+        realized += pnl;
+        if (pnl > 0) { wins++; gains += pnl; } else if (pnl < 0) { losses++; lossAmt += pnl; }
+        if (avg && q) pcts.push(pnl / (avg * q) * 100);
+      }
+      p.cost -= avg * q; p.qty -= q;
+      if (p.qty <= 0) { p.qty = 0; p.cost = 0; }
+    }
+    pos.set(k, p);
+  });
+  const closed = wins + losses;
+  return {
+    days, cutoff, closed, wins, losses, realized,
+    winRate: closed ? Math.round(wins / closed * 100) : null,
+    avgPct: pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null,
+    avgWin: wins ? gains / wins : null,
+    avgLoss: losses ? lossAmt / losses : null
+  };
+}
+/* 실패·복기 태그 집계 */
+function tagStats(days) {
+  const cutoff = days == null ? null : ymdDaysAgo(days);
+  const map = new Map();
+  state.journal.forEach(e => {
+    if (cutoff && String(e.date || "") < cutoff) return;
+    (e.tags || []).forEach(t => map.set(t, (map.get(t) || 0) + 1));
+  });
+  return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+}
+const TAG_GOOD = "원칙 준수";
+function render3M() {
+  const el = $("#j3m");
+  if (!el) return;
+  const w = tradeStatsWindow(90);
+  const tags = tagStats(90);
+  const tagHTML = (list) => list.map(t =>
+    '<span class="jtag ' + (t[0] === TAG_GOOD ? "good" : "bad") + '">' + esc(t[0]) + ' ' + t[1] + '</span>').join("");
+  if (!w.closed) {
+    el.innerHTML = '<h3>최근 3개월 복기</h3>' +
+      '<p class="hint">90일 승률·손익 · 매도 기록이 쌓이면 자동으로 계산돼</p>' +
+      '<div class="empty" style="padding:16px 8px">최근 90일 안에 매도 기록이 없어.<br>' +
+        (tags.length ? '복기 태그는 ' + tags.length + '가지 달려 있어.' : '매수에 복기 태그를 달아두면 패턴이 보여.') + '</div>' +
+      (tags.length ? '<div style="margin-top:4px">' + tagHTML(tags) + '</div>' : "");
+    return;
+  }
+  const wr = w.winRate;
+  const tone = wr >= 60 ? "" : wr >= 40 ? "mid" : "low";
+  const failTags = tags.filter(t => t[0] !== TAG_GOOD);
+  const worst = failTags[0];
+  el.innerHTML = '<h3>최근 3개월 복기</h3>' +
+    '<p class="hint">' + esc(w.cutoff) + ' 이후 매도 ' + w.closed + '건 기준 · 김종봉은 실패한 매매 위주로 3개월 단위 승률을 봐</p>' +
+    '<div class="wr3" style="margin-top:6px">' +
+      '<div class="big-gauge ' + tone + '" style="--p:' + wr + '"><span><b>' + wr + '%</b><small>승률</small></span></div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="kv" style="grid-template-columns:1fr 1fr">' +
+          '<div><span>이익 / 손실</span><b>' + w.wins + '승 ' + w.losses + '패</b></div>' +
+          '<div><span>실현 손익</span><b class="' + (w.realized > 0 ? "up" : w.realized < 0 ? "down" : "") + '">' + (w.realized > 0 ? "+" : "") + won(w.realized) + '원</b></div>' +
+          '<div><span>평균 수익률</span><b class="' + ((w.avgPct || 0) > 0 ? "up" : (w.avgPct || 0) < 0 ? "down" : "") + '">' + pct(w.avgPct) + '</b></div>' +
+          '<div><span>평균 이익 / 손실</span><b>' + (w.avgWin == null ? "—" : "+" + won(w.avgWin)) + ' / ' + (w.avgLoss == null ? "—" : won(w.avgLoss)) + '</b></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    (tags.length ? '<div style="margin-top:10px">' + tagHTML(tags) + '</div>' : '') +
+    '<div class="note">' + (wr >= 60
+      ? '3개월 승률 ' + wr + '%면 지금 템포는 지킬 만해. 다만 이익 폭보다 손실 폭이 크면 승률이 높아도 계좌는 줄어 — 평균 손실이 평균 이익의 1/2을 넘지 않는지 봐.'
+      : wr >= 40
+        ? '3개월 승률 ' + wr + '%는 반타작 근처야. ' + (worst ? '가장 많이 붙은 태그가 “' + esc(worst[0]) + '”(' + worst[1] + '회) — 이 패턴 하나만 피해도 결과가 달라져.' : '실패한 매매에 태그를 달아 패턴을 찾아봐.')
+        : '3개월 승률 ' + wr + '%면 손실이 더 많은 구간이야. 1차 비중을 줄이고, 손절선 먼저 정하고 들어가는 것부터 다시 잡자.' +
+          (worst ? ' 가장 잦은 실패 태그는 “' + esc(worst[0]) + '”(' + worst[1] + '회).' : '')) + '</div>';
+}
 
 /* ══════════ 매매일지 렌더 ══════════ */
 function renderJournal() {
@@ -2160,6 +2416,8 @@ function renderJournal() {
           '<div class="meta">' + esc(e.date) + ' · ' + won(e.price) + '원 × ' + won(e.qty) + '주 = ' + won(amt) + '원' +
             (e.stop ? ' · 손절 ' + won(e.stop) : ' · <span style="color:var(--amber)">손절선 없음</span>') + '</div>' +
           (e.note ? '<div class="jnote">' + esc(e.note) + '</div>' : '') +
+          ((e.tags || []).length ? '<div>' + e.tags.map(t => '<span class="jtag ' + (t === TAG_GOOD ? "good" : "bad") + '">' + esc(t) + '</span>').join("") + '</div>' : '') +
+          (e.review ? '<div class="jreview">📝 ' + esc(e.review) + '</div>' : '') +
         '</div>' +
         '<div class="jact"><button data-act="editJournal" data-id="' + e.id + '" aria-label="수정">✎</button>' +
         '<button data-act="delJournal" data-id="' + e.id + '" aria-label="삭제">🗑</button></div>' +
@@ -2167,6 +2425,7 @@ function renderJournal() {
     }).join("");
   }
   renderCoach(hs, ts);
+  render3M();
 }
 function renderCoach(hs, ts) {
   const rows = allRows();
@@ -2188,6 +2447,13 @@ function renderCoach(hs, ts) {
   }
   const recent30 = state.journal.filter(e => e.date && daysBetween(e.date, todayStr()) <= 30 && daysBetween(e.date, todayStr()) >= 0);
   if (recent30.length >= 6) msgs.push({ lv: "tip", t: "최근 30일 매매 " + recent30.length + "건. 손이 너무 자주 나가고 있어. 계획에 없던 매매인지 한 번 봐." });
+  const w3 = tradeStatsWindow(90);
+  if (w3.closed >= 3) msgs.push({ lv: w3.winRate >= 50 ? "good" : "warn",
+    t: "최근 3개월 매도 " + w3.closed + "건 중 " + w3.wins + "건 이익(" + w3.winRate + "%). " +
+      (w3.winRate >= 50 ? "3개월 단위로 봐도 규칙이 먹히고 있어." : "실패한 매매에 태그를 달아 모으면 패턴이 보여. 그 패턴만 빼도 승률이 달라져.") });
+  const tagMap = tagStats(90);
+  const worstTag = tagMap.filter(t => t[0] !== TAG_GOOD)[0];
+  if (worstTag && worstTag[1] >= 2) msgs.push({ lv: "warn", t: "최근 3개월 “" + esc(worstTag[0]) + "” 태그가 " + worstTag[1] + "번 붙었어. 같은 실수를 반복하고 있다는 뜻이야." });
   const noStopHeld = hs.filter(h => !h.stop);
   if (!state.journal.length) msgs.push({ lv: "tip", t: "아직 기록이 없어. 오늘 추천 1개만 골라 1차 매수와 손절선을 적어봐." });
   if (!msgs.length) msgs.push({ lv: "good", t: "지금은 규칙에서 벗어난 기록이 없어. 손절선·근거 메모가 다 붙어 있어." });
@@ -2291,7 +2557,9 @@ function renderSetup() {
     '매매일지·설정은 이 브라우저(localStorage)에만 저장돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게.<br>' +
-    '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 + RS 보정(±10). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율은 2025 사업연도 결산 기준(2026-11-22 네이버금융 조회).<br>' +
+    '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 + RS 보정(±10). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
+    '재무 안정성 체크리스트(김종봉 3원칙)는 시트 <b>추천종목</b> 탭 AE·AF열(유보율·최대주주지분)을 읽어 부채비율 100% 이하·유보율 300% 이상·최대주주 30% 이상을 ✅/⚠️로 보여줘. 점수에는 넣지 않아.<br>' +
+    '눌림 거래량·위험 경고(김정수)는 AG·AH열(눌림거래량비율·위험경고). 눌림 33% 이하면 🟢 세력 미이탈, 경고는 최근 120거래일 저가 대비 +100%·고거래량 장대음봉·긴 윗꼬리 음봉으로 판정해. 매매일지에는 최근 3개월(90일) 승률 카드와 복기 태그·한 줄 복기가 있어.<br>' +
     'RS(상대강도)는 시트 <b>추천종목</b> 탭 AB~AD열(RS_20D·RS_60D·상대강도 등급)을 읽어. RS 종합점수 = 50 + 0.6×RS_20D + 0.4×RS_60D, 50이 코스피와 같고 60 이상이면 강함. 2026-11-20 종가 기준 Yahoo Finance 일봉으로 계산.<br>' +
     '저수지 신호등은 시트 <b>시장지표</b> 탭(코스피·고점 대비 낙폭·저수지 단계·권장 예비현금·단계별 대응표)을 읽어. 읽기 실패하면 마지막에 받아든 값으로 보여줘.<br>' +
     '매매 권유가 아닌 판단 보조 자료야. 11/23(월) 개장 후 수치는 달라지고, 삼진제약은 11/23 기자간담회 결과에 따라 갭이 날 수 있어. 손절선은 꼭 같이 걸어둬.';
@@ -2335,6 +2603,9 @@ document.addEventListener("click", (ev) => {
     });
     return;
   }
+
+  const tagBtn = ev.target.closest("[data-jtag]");
+  if (tagBtn) { tagBtn.classList.toggle("on"); return; }
 
   const el = ev.target.closest("[data-act]");
   if (!el) return;
@@ -2455,7 +2726,9 @@ $("#jForm").addEventListener("submit", (e) => {
     code: $("#jCode").value.trim() || (row ? row.code : ""),
     price, qty,
     stop: num($("#jStop").value),
-    note: $("#jNote").value.trim()
+    note: $("#jNote").value.trim(),
+    tags: $$("#jTags button.on").map(b => b.dataset.jtag),
+    review: $("#jReview").value.trim()
   };
   if (state.edit.journalId) {
     state.journal = state.journal.map(x => x.id === state.edit.journalId ? entry : x);
@@ -2549,6 +2822,8 @@ function resetJournalForm() {
   $("#jCancel").classList.add("hidden");
   $("#jForm").reset();
   $("#jDate").value = todayStr();
+  $$("#jTags button").forEach(b => b.classList.remove("on"));
+  $("#jReview").value = "";
   $$("#jTypeSeg button").forEach(b => { b.classList.toggle("on", b.dataset.jtype === "buy"); b.classList.remove("sell"); });
 }
 function startEditJournal(id) {
@@ -2567,6 +2842,8 @@ function startEditJournal(id) {
   $("#jQty").value = e.qty;
   $("#jStop").value = e.stop || "";
   $("#jNote").value = e.note || "";
+  $$("#jTags button").forEach(b => b.classList.toggle("on", (e.tags || []).indexOf(b.dataset.jtag) >= 0));
+  $("#jReview").value = e.review || "";
   $$("#jTypeSeg button").forEach(b => {
     b.classList.toggle("on", b.dataset.jtype === e.type);
     b.classList.toggle("sell", b.dataset.jtype === "sell" && e.type === "sell");
