@@ -1273,7 +1273,7 @@ function drawChart() {
   });
   const on = chartState.on;
   const guide = chartState.guide || {};
-  const padL = 4, padR = 60, padT = 12, padB = 18;
+  const padL = 4, padR = 68, padT = 12, padB = 18;
   const volH = Math.max(34, Math.round(cssH * 0.19));
   const volGap = 9;
   const priceH = cssH - padT - padB - volH - volGap;
@@ -1300,7 +1300,7 @@ function drawChart() {
   /* 그리드 + 가격 축 */
   ctx.font = "9px " + font;
   ctx.textBaseline = "middle";
-  ctx.textAlign = "left";
+  ctx.textAlign = "right";
   for (let k = 0; k <= 4; k++) {
     const v = lo + (hi - lo) * k / 4;
     const y = Math.round(yOf(v)) + 0.5;
@@ -1308,7 +1308,7 @@ function drawChart() {
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
     ctx.fillStyle = "rgba(142,160,190,.7)";
-    ctx.fillText(won(v), padL + plotW + 5, y);
+    ctx.fillText(won(v), cssW - 2, y);
   }
   ctx.strokeStyle = "rgba(36,49,73,.9)";
   ctx.beginPath(); ctx.moveTo(padL, Math.round(volBase) + 0.5); ctx.lineTo(padL + plotW, Math.round(volBase) + 0.5); ctx.stroke();
@@ -1386,7 +1386,7 @@ function drawChart() {
     gs.forEach(x => {
       const y = yOf(x.v);
       const label = x.t + " " + won(x.v);
-      const tw = Math.min(ctx.measureText(label).width + 4, padR - 2);
+      const tw = Math.min(ctx.measureText(label).width + 6, padR - 8);
       ctx.fillStyle = "#111a2b";
       ctx.fillRect(padL + plotW + 2, y - 7.5, tw, 15);
       ctx.fillStyle = x.c;
@@ -1402,9 +1402,12 @@ function drawChart() {
     ctx.textAlign = align;
     ctx.fillText(String(view[i].d).slice(5).replace("-", "."), align === "left" ? padL : align === "right" ? padL + plotW : xOf(i), cssH - 2);
   };
-  tick(0, "left");
-  if (n > 2) tick(Math.floor((n - 1) / 2), "center");
-  tick(n - 1, "right");
+  const hvIdx = chartState.hover && chartState.hover.i != null ? clamp(chartState.hover.i, 0, n - 1) : null;
+  const nearHover = (i) => hvIdx != null && Math.abs(xOf(i) - xOf(hvIdx)) < 48;
+  const midIdx = Math.floor((n - 1) / 2);
+  if (!nearHover(0)) tick(0, "left");
+  if (n > 2 && !nearHover(midIdx)) tick(midIdx, "center");
+  if (n > 2 && !nearHover(n - 1)) tick(n - 1, "right");
 
   /* 십자선 */
   const hv = chartState.hover;
@@ -1422,7 +1425,7 @@ function drawChart() {
     ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
     const lab = won(b.c);
     ctx.font = "9.5px " + font;
-    const tw = Math.min(ctx.measureText(lab).width + 6, padR - 2);
+    const tw = Math.min(ctx.measureText(lab).width + 8, padR - 8);
     ctx.fillStyle = "#1d2a41";
     ctx.fillRect(padL + plotW + 2, y - 7.5, tw, 15);
     ctx.fillStyle = "#e9eefb";
