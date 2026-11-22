@@ -1386,9 +1386,8 @@ function drawChart() {
     gs.forEach(x => {
       const y = yOf(x.v);
       const label = x.t + " " + won(x.v);
-      const tw = Math.min(ctx.measureText(label).width + 6, padR - 8);
       ctx.fillStyle = "#111a2b";
-      ctx.fillRect(padL + plotW + 2, y - 7.5, tw, 15);
+      ctx.fillRect(padL + plotW + 2, y - 7.5, padR - 4, 15);
       ctx.fillStyle = x.c;
       ctx.fillText(label, padL + plotW + 4, y);
     });
@@ -1425,9 +1424,8 @@ function drawChart() {
     ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
     const lab = won(b.c);
     ctx.font = "9.5px " + font;
-    const tw = Math.min(ctx.measureText(lab).width + 8, padR - 8);
     ctx.fillStyle = "#1d2a41";
-    ctx.fillRect(padL + plotW + 2, y - 7.5, tw, 15);
+    ctx.fillRect(padL + plotW + 2, y - 7.5, padR - 4, 15);
     ctx.fillStyle = "#e9eefb";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
