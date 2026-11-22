@@ -1904,16 +1904,16 @@ function rsCardHTML(r) {
       '<p class="hint">이 종목은 RS 값이 없어. 시트 추천종목 AB~AD열(RS_20D·RS_60D·상대강도 등급)을 넣으면 여기에 표시돼.</p></div>';
   }
   const g = rsGradeOf(r);
-  const box = (label, mine, idx) => {
-    if (mine == null) return '';
-    const beat = idx == null ? null : mine - idx;
+  const box = (label, rs, idx) => {
+    if (rs == null) return '';
+    const mine = idx == null ? null : rs + idx;
     return '<div class="rsbox"><span>' + label + ' · 코스피 대비</span>' +
-      '<b class="' + (beat == null || beat >= 0 ? "up" : "down") + '">' + (beat == null ? pct(mine) : pct(beat) + 'p') + '</b>' +
-      '<em>종목 ' + pct(mine) + ' · 코스피 ' + (idx == null ? "—" : pct(idx)) + '</em></div>';
+      '<b class="' + (rs >= 0 ? "up" : "down") + '">' + pct(rs) + 'p</b>' +
+      '<em>종목 ' + (mine == null ? "—" : pct(mine)) + ' · 코스피 ' + (idx == null ? "—" : pct(idx)) + '</em></div>';
   };
   return '<div class="card" style="margin:12px 0">' +
     '<h3>코스피 대비 상대강도(RS)</h3>' +
-    '<p class="hint">같은 기간 코스피보다 얼마나 더 바텼나 · 기준 ' + esc(m.base || r.base || "—") + '</p>' +
+    '<p class="hint">같은 기간 코스피보다 얼마나 더 버텼나 · 기준 ' + esc(m.base || r.base || "—") + '</p>' +
     '<div style="display:flex;gap:12px;align-items:center;margin-top:2px">' +
       '<div class="big-gauge ' + (s >= 60 ? "" : s >= 40 ? "mid" : "low") + '" style="--p:' + s + '"><span><b>' + s + '</b><small>' + esc(g) + '</small></span></div>' +
       '<div style="flex:1;min-width:0"><div class="rsgrid">' + box("20거래일", r.rs20, m.r20) + box("60거래일", r.rs60, m.r60) + '</div></div>' +
@@ -2044,7 +2044,7 @@ function openDetail(key) {
       '<p class="hint">RS가 강해도 사는 값이 틀리면 손실이 나. 나가고 들어오는 기준을 먼저 정해둬.</p>' +
       '<div class="ladder">' +
         '<div class="lad b1"><span class="t">1차 익절</span><span class="v">+20%<small>에서 절반</small></span><span class="g">나머지는 224선까지</span></div>' +
-        '<div class="lad stop"><span class="t">손절</span><span class="v">-7%<small> · 224선 종가 이탈</small></span><span class="g">미렴 없이 교체</span></div>' +
+        '<div class="lad stop"><span class="t">손절</span><span class="v">-7%<small> · 224선 종가 이탈</small></span><span class="g">미련 없이 교체</span></div>' +
         '<div class="lad b2"><span class="t">교체</span><span class="v">RS 강함<small> · 수렴 낮은 곳</small></span><span class="g">손절 자금 이동</span></div>' +
       '</div>' +
       '<div class="note">반 토막은 익절하고 남은 반은 세력선을 따라가 — 오르는 종목을 일찍 다 팔아버리는 후회를 줄이는 방법이야. -7%에 닿으면 이유를 따지지 말고 정리하고, 그 돈은 코스피보다 강하면서 세 선이 붙은 다른 종목으로 옮겨.</div>' +
