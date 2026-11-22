@@ -157,6 +157,30 @@ select.sort{background:var(--card);border:1px solid var(--line);color:var(--mute
 .brk b{flex:0 0 26px;text-align:right;color:var(--text);font-size:11px}
 .maplab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:6px}
 .maplab b{display:block;color:var(--text);font-size:12px;font-weight:700;margin-top:1px}
+
+/* ── 일봉 캔들차트 ── */
+.chartcard{padding-bottom:12px}
+.chart-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.chart-period{display:flex;gap:4px;flex:0 0 auto}
+.chart-period button{border:1px solid var(--line);background:#0d1626;border-radius:9px;padding:4px 9px;font-size:11px;font-weight:700;color:var(--muted)}
+.chart-period button.on{background:rgba(49,208,170,.14);border-color:rgba(49,208,170,.5);color:var(--teal)}
+.chart-chips{display:flex;gap:5px;flex-wrap:wrap;margin:9px 0 8px}
+.chart-chips button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#0d1626;
+  border-radius:999px;padding:4px 9px;font-size:10.5px;font-weight:800;color:var(--dim);opacity:.62}
+.chart-chips button i{width:12px;height:2.5px;border-radius:2px;background:currentColor;display:block}
+.chart-chips button.on{opacity:1;background:rgba(255,255,255,.055);border-color:currentColor}
+.chartwrap{position:relative;width:100%;height:310px;margin-top:2px;touch-action:pan-y}
+#candleChart{width:100%;height:100%;display:block;cursor:crosshair}
+.charttip{position:absolute;top:6px;pointer-events:none;background:rgba(8,13,22,.95);border:1px solid var(--line);
+  border-radius:10px;padding:7px 9px;font-size:10.5px;line-height:1.55;min-width:124px;
+  box-shadow:0 8px 22px rgba(0,0,0,.5);z-index:3}
+.charttip>b{display:block;font-size:11px;margin-bottom:3px;letter-spacing:-0.01em}
+.charttip .tr{display:flex;justify-content:space-between;gap:12px}
+.charttip .tr>span{color:var(--dim)}
+.charttip .tr>b{display:inline;font-weight:700;font-size:10.5px;margin:0;letter-spacing:0}
+.chart-empty{height:180px;display:grid;place-items:center;text-align:center;color:var(--dim);font-size:12px;padding:0 22px;line-height:1.5}
+.chart-legend{display:flex;gap:11px;flex-wrap:wrap;font-size:10px;color:var(--dim);margin-top:9px}
+.chart-legend i{display:inline-block;width:11px;height:6px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .ladder{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .lad{display:flex;align-items:center;gap:9px;background:#111b2c;border:1px solid var(--line);border-radius:11px;padding:9px 11px;font-size:12.5px}
 .lad .t{flex:0 0 46px;font-size:10.5px;font-weight:800;color:var(--muted)}
@@ -573,14 +597,16 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const LS = {
   cache:  "dante.reco.cache.v1",
   journal:"dante.journal.v1",
   isa:    "dante.isa.v1",
   custom: "dante.custom.v1",
   ui:     "dante.ui.v1",
-  uiTotal:"dante.ui.sorttotal.v1"
+  uiTotal:"dante.ui.sorttotal.v1",
+  chart:  "dante.chart.cache.v1",
+  chartUi:"dante.chart.ui.v1"
 };
 
 /* ── 시트를 못 읽을 때 쓰는 기본 데이터(2026-11-20 종가) ── */
@@ -1032,6 +1058,395 @@ function currentBase() {
   return dates.length ? dates[dates.length - 1] : (state.sheet.base || "");
 }
 
+/* ══════════ 일봉 차트 (차트데이터 탭) ══════════ */
+const CHART_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("차트데이터") + "&tqx=out:csv";
+const CHART_MA = { ma112: { c: "#f0b429", t: "112선" }, ma224: { c: "#31d0aa", t: "224선" }, ma448: { c: "#9b7bff", t: "448선" } };
+const chartState = {
+  byCode: {}, status: "idle", fetchedAt: null, error: null,
+  code: null, row: null, data: null, guide: {},
+  days: 120, on: { ma112: true, ma224: true, ma448: true, guide: true },
+  hover: null, geom: null
+};
+const chartCode = (code) => String(code == null ? "" : code).replace(/[^0-9]/g, "").padStart(6, "0");
+
+function parseChartRows(text) {
+  const rows = parseDelimited(text, detectDelim(text));
+  if (rows.length < 2) return null;
+  const head = rows[0].map(c => nk(c).replace(/[()]/g, ""));
+  const idx = (names, def) => { for (let i = 0; i < names.length; i++) { const j = head.indexOf(names[i]); if (j >= 0) return j; } return def; };
+  const p = {
+    code: idx(["종목코드", "코드", "code", "ticker"], 0),
+    date: idx(["날짜", "일자", "date"], 1),
+    o: idx(["시가", "open"], 2),
+    h: idx(["고가", "high"], 3),
+    l: idx(["저가", "low"], 4),
+    c: idx(["종가", "close"], 5),
+    v: idx(["거래량", "volume"], 6),
+    m112: idx(["ma112", "112일선", "112"], 7),
+    m224: idx(["ma224", "224일선", "224"], 8),
+    m448: idx(["ma448", "448일선", "448"], 9)
+  };
+  const out = {};
+  rows.slice(1).forEach(cells => {
+    if (!cells || !cells.length) return;
+    const raw = String(cells[p.code] == null ? "" : cells[p.code]).replace(/[^0-9]/g, "");
+    const c = num(cells[p.c]);
+    if (!raw || c == null) return;
+    const code = raw.length >= 5 && raw.length <= 6 ? raw.padStart(6, "0") : raw;
+    const bar = {
+      d: String(cells[p.date] == null ? "" : cells[p.date]).trim(),
+      o: num(cells[p.o]), h: num(cells[p.h]), l: num(cells[p.l]), c: c, v: num(cells[p.v]) || 0,
+      m112: num(cells[p.m112]), m224: num(cells[p.m224]), m448: num(cells[p.m448])
+    };
+    if (bar.o == null || bar.h == null || bar.l == null || !bar.d) return;
+    (out[code] = out[code] || []).push(bar);
+  });
+  Object.keys(out).forEach(k => out[k].sort((a, b) => String(a.d).localeCompare(String(b.d))));
+  return out;
+}
+async function syncChart() {
+  if (chartState.status === "loading") return;
+  chartState.status = "loading";
+  refreshChartCard();
+  try {
+    const res = await fetch(CHART_CSV + "&_=" + Date.now(), { cache: "no-store", credentials: "omit" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const parsed = parseChartRows(await res.text());
+    if (!parsed || !Object.keys(parsed).length) throw new Error("빈 차트 데이터");
+    chartState.byCode = parsed;
+    chartState.status = "live";
+    chartState.error = null;
+    chartState.fetchedAt = Date.now();
+    store.set(LS.chart, { byCode: parsed, fetchedAt: chartState.fetchedAt });
+  } catch (e) {
+    const hasCache = !!(chartState.byCode && Object.keys(chartState.byCode).length);
+    chartState.status = hasCache ? "cache" : "error";
+    chartState.error = String((e && e.message) || e);
+  }
+  refreshChartCard();
+  renderSetup();
+}
+function barsFor(r) {
+  if (!r) return null;
+  return (chartState.byCode && chartState.byCode[chartCode(r.code)]) || null;
+}
+function chartStatusText() {
+  const n = chartState.byCode ? Object.keys(chartState.byCode).length : 0;
+  if (chartState.status === "live") return "정상 · " + n + "종목 일봉";
+  if (chartState.status === "loading") return n ? "갱신 중 · " + n + "종목" : "불러오는 중";
+  if (chartState.status === "cache") return "캐시 · " + n + "종목";
+  if (chartState.status === "error") return "연결 실패";
+  return "대기";
+}
+
+function chartChip(k, label) {
+  const on = !!chartState.on[k];
+  const col = k === "guide" ? "#e9eefb" : CHART_MA[k].c;
+  return '<button type="button" class="' + (on ? "on" : "") + '" data-act="chartToggle" data-k="' + k + '"' +
+    (on ? ' style="color:' + col + '"' : '') + '><i></i>' + label + '</button>';
+}
+function chartCardHTML(r) {
+  const bars = barsFor(r);
+  const st = chartState.status;
+  const has = !!(bars && bars.length);
+  const period = has
+    ? '<div class="chart-period">' + [60, 120].map(d =>
+        '<button type="button" data-act="chartPeriod" data-days="' + d + '" class="' + (chartState.days === d ? "on" : "") + '">' + d + '일</button>').join("") + '</div>'
+    : "";
+  const chips = has
+    ? '<div class="chart-chips">' + chartChip("ma112", "112선") + chartChip("ma224", "224선") + chartChip("ma448", "448선") +
+      chartChip("guide", "매수·손절선") + '</div>'
+    : "";
+  let body;
+  if (!has) {
+    const msg = st === "loading" ? "일봉 차트를 불러오는 중…"
+      : st === "error" ? "차트데이터 탭을 읽지 못했어. 설정에서 시트 공개 상태를 확인해줘."
+      : "이 종목은 차트데이터 탭에 일봉이 없어.";
+    body = '<div class="chart-empty">' + msg + '</div>';
+  } else {
+    body = '<div class="chartwrap"><canvas id="candleChart" aria-label="일봉 차트"></canvas>' +
+        '<div class="charttip hidden" id="chartTip"></div></div>' +
+      '<div class="chart-legend">' +
+        '<span><i style="background:#f4626a"></i>양봉</span>' +
+        '<span><i style="background:#5b9cff"></i>음봉</span>' +
+        '<span><i style="background:#f0b429"></i>매집봉(20일 평균 2배↑)</span>' +
+      '</div>';
+  }
+  const win = has ? bars.slice(Math.max(0, bars.length - chartState.days)) : [];
+  const sub = has ? '최근 ' + win.length + '거래일 · ' + esc(win[0].d) + ' ~ ' + esc(win[win.length - 1].d) +
+    ' · 종가 ' + won(win[win.length - 1].c) + '원' : '시트 차트데이터 탭 일봉';
+  return '<div class="chart-head"><h3>일봉 차트</h3>' + period + '</div>' +
+    '<p class="hint">' + sub + '</p>' + chips + body;
+}
+function refreshChartCard() {
+  const card = document.getElementById("chartCard");
+  const r = chartState.row;
+  if (!card || !r) return;
+  const sheet = document.getElementById("detail");
+  if (!sheet || sheet.classList.contains("hidden")) return;
+  card.innerHTML = chartCardHTML(r);
+  chartState.hover = null;
+  mountChart(r);
+}
+function mountChart(r) {
+  const cv = document.getElementById("candleChart");
+  chartState.row = r;
+  chartState.code = chartCode(r.code);
+  chartState.data = barsFor(r);
+  chartState.hover = null;
+  chartState.geom = null;
+  if (!cv || !chartState.data || !chartState.data.length) return;
+  cv.addEventListener("pointerdown", chartPointer);
+  cv.addEventListener("pointermove", chartPointer);
+  cv.addEventListener("pointerleave", chartPointerOut);
+  cv.addEventListener("pointercancel", chartPointerOut);
+  drawChart();
+}
+function chartPointer(ev) {
+  const g = chartState.geom;
+  if (!g) return;
+  const cv = ev.currentTarget;
+  const rect = cv.getBoundingClientRect();
+  const x = ev.clientX - rect.left;
+  if (x < g.padL - 6) { chartPointerOut(); return; }
+  const i = clamp(Math.floor((x - g.padL) / g.step), 0, g.n - 1);
+  chartState.hover = { i: i };
+  drawChart();
+  showChartTip(i, x);
+}
+function chartPointerOut() {
+  if (chartState.hover == null) return;
+  chartState.hover = null;
+  const tip = document.getElementById("chartTip");
+  if (tip) tip.classList.add("hidden");
+  drawChart();
+}
+function showChartTip(i, x) {
+  const tip = document.getElementById("chartTip");
+  const g = chartState.geom;
+  if (!tip || !g || !g.view[i]) return;
+  const b = g.view[i];
+  const prev = i > 0 ? g.view[i - 1] : null;
+  const chg = prev && prev.c ? (b.c - prev.c) / prev.c * 100 : null;
+  const mult = g.vma[i] ? b.v / g.vma[i] : null;
+  const line = (label, val, col) => '<div class="tr"><span' + (col ? ' style="color:' + col + '"' : '') + '>' + label + '</span><b>' + val + '</b></div>';
+  tip.innerHTML = '<b>' + esc(b.d) + '</b>' +
+    '<div class="tr"><span>종가</span><b>' + won(b.c) +
+      (chg == null ? '' : ' <em class="' + (chg >= 0 ? 'up' : 'down') + '" style="font-style:normal">' + pct(chg) + '</em>') +
+    '</b></div>' +
+    line("시·고·저", won(b.o) + ' / ' + won(b.h) + ' / ' + won(b.l)) +
+    (b.m112 != null ? line("112선", won(b.m112), CHART_MA.ma112.c) : '') +
+    (b.m224 != null ? line("224선", won(b.m224), CHART_MA.ma224.c) : '') +
+    (b.m448 != null ? line("448선", won(b.m448), CHART_MA.ma448.c) : '') +
+    '<div class="tr"><span>거래량</span><b>' + won(b.v) +
+      (mult ? ' <em style="color:' + (mult >= 2 ? '#f0b429' : 'var(--dim)') + ';font-style:normal">' + mult.toFixed(1) + '배</em>' : '') +
+    '</b></div>';
+  tip.classList.remove("hidden");
+  if (x > g.w * 0.55) { tip.style.left = "8px"; tip.style.right = "auto"; }
+  else { tip.style.left = "auto"; tip.style.right = "8px"; }
+}
+
+function drawChart() {
+  const cv = document.getElementById("candleChart");
+  if (!cv) return;
+  const all = chartState.data;
+  const cssW = cv.clientWidth || (cv.parentElement ? cv.parentElement.clientWidth : 0);
+  const cssH = cv.clientHeight || 310;
+  if (!cssW || !all || !all.length) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const pw = Math.round(cssW * dpr), ph = Math.round(cssH * dpr);
+  if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const n = Math.min(chartState.days, all.length);
+  const start = all.length - n;
+  const view = all.slice(start);
+  const vma = view.map((b, i) => {
+    const gi = start + i;
+    if (gi < 20) return null;
+    let s = 0;
+    for (let k = gi - 19; k <= gi; k++) s += (all[k].v || 0);
+    return s / 20;
+  });
+  const on = chartState.on;
+  const guide = chartState.guide || {};
+  const padL = 4, padR = 60, padT = 12, padB = 18;
+  const volH = Math.max(34, Math.round(cssH * 0.19));
+  const volGap = 9;
+  const priceH = cssH - padT - padB - volH - volGap;
+  const plotW = cssW - padL - padR;
+  const step = plotW / n;
+
+  const vals = [];
+  view.forEach(b => {
+    vals.push(b.h, b.l);
+    if (on.ma112 && b.m112 != null) vals.push(b.m112);
+    if (on.ma224 && b.m224 != null) vals.push(b.m224);
+    if (on.ma448 && b.m448 != null) vals.push(b.m448);
+  });
+  if (on.guide) [guide.buy1, guide.buy2, guide.stop, guide.price].forEach(v => { if (v) vals.push(v); });
+  let hi = Math.max.apply(null, vals), lo = Math.min.apply(null, vals);
+  if (!isFinite(hi) || !isFinite(lo) || hi <= lo) { hi = lo + 1; }
+  const padV = (hi - lo) * 0.05;
+  hi += padV; lo -= padV;
+  const yOf = v => padT + (hi - v) / (hi - lo) * priceH;
+  const xOf = i => padL + (i + 0.5) * step;
+  const volBase = padT + priceH + volGap + volH;
+  const font = "-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
+
+  /* 그리드 + 가격 축 */
+  ctx.font = "9px " + font;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (hi - lo) * k / 4;
+    const y = Math.round(yOf(v)) + 0.5;
+    ctx.strokeStyle = "rgba(36,49,73,.8)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+    ctx.fillStyle = "rgba(142,160,190,.7)";
+    ctx.fillText(won(v), padL + plotW + 5, y);
+  }
+  ctx.strokeStyle = "rgba(36,49,73,.9)";
+  ctx.beginPath(); ctx.moveTo(padL, Math.round(volBase) + 0.5); ctx.lineTo(padL + plotW, Math.round(volBase) + 0.5); ctx.stroke();
+
+  /* 거래량 */
+  const vmax = Math.max.apply(null, view.map(b => b.v || 0)) || 1;
+  const bwVol = Math.max(1.5, Math.min(11, step * 0.6));
+  view.forEach((b, i) => {
+    const hgt = Math.max(1, (b.v || 0) / vmax * volH);
+    const up = b.c >= b.o;
+    const acc = vma[i] && b.v >= vma[i] * 2;
+    ctx.fillStyle = acc ? "rgba(240,180,41,.85)" : (up ? "rgba(244,98,106,.45)" : "rgba(91,156,255,.45)");
+    ctx.fillRect(xOf(i) - bwVol / 2, volBase - hgt, bwVol, hgt);
+  });
+
+  /* 캔들 */
+  const bw = Math.max(1.4, Math.min(11, step * 0.66));
+  view.forEach((b, i) => {
+    const x = xOf(i);
+    const up = b.c >= b.o;
+    const col = up ? "#f4626a" : "#5b9cff";
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x) + 0.5, yOf(b.h));
+    ctx.lineTo(Math.round(x) + 0.5, yOf(b.l));
+    ctx.stroke();
+    const yO = yOf(b.o), yC = yOf(b.c);
+    const top = Math.min(yO, yC);
+    const hgt = Math.max(1, Math.abs(yC - yO));
+    if (bw <= 2) { ctx.fillRect(Math.round(x), top, 1, hgt); }
+    else { ctx.fillRect(x - bw / 2, top, bw, hgt); }
+  });
+
+  /* 세력선 */
+  const drawMA = (key, color, width) => {
+    if (!on[key]) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    let started = false;
+    view.forEach((b, i) => {
+      const v = b[key];
+      if (v == null) { started = false; return; }
+      const x = xOf(i), y = yOf(v);
+      if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+    });
+    ctx.stroke();
+  };
+  drawMA("m448", CHART_MA.ma448.c, 1.6);
+  drawMA("m112", CHART_MA.ma112.c, 1.8);
+  drawMA("m224", CHART_MA.ma224.c, 2.8);
+
+  /* 매수·손절 가이드 점선 + 우측 라벨 */
+  if (on.guide) {
+    const gs = [
+      { v: guide.buy2, c: "#7ee0c2", t: "2차" },
+      { v: guide.buy1, c: "#e9eefb", t: "1차" },
+      { v: guide.stop, c: "#f4626a", t: "손절" }
+    ].filter(x => x.v);
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.2;
+    gs.forEach(x => {
+      const y = Math.round(yOf(x.v)) + 0.5;
+      ctx.strokeStyle = x.c;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.font = "9.5px " + font;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    gs.forEach(x => {
+      const y = yOf(x.v);
+      const label = x.t + " " + won(x.v);
+      const tw = Math.min(ctx.measureText(label).width + 4, padR - 2);
+      ctx.fillStyle = "#111a2b";
+      ctx.fillRect(padL + plotW + 2, y - 7.5, tw, 15);
+      ctx.fillStyle = x.c;
+      ctx.fillText(label, padL + plotW + 4, y);
+    });
+  }
+
+  /* 날짜 축 */
+  ctx.fillStyle = "rgba(142,160,190,.75)";
+  ctx.font = "9px " + font;
+  ctx.textBaseline = "bottom";
+  const tick = (i, align) => {
+    ctx.textAlign = align;
+    ctx.fillText(String(view[i].d).slice(5).replace("-", "."), align === "left" ? padL : align === "right" ? padL + plotW : xOf(i), cssH - 2);
+  };
+  tick(0, "left");
+  if (n > 2) tick(Math.floor((n - 1) / 2), "center");
+  tick(n - 1, "right");
+
+  /* 십자선 */
+  const hv = chartState.hover;
+  if (hv && hv.i != null) {
+    const i = clamp(hv.i, 0, n - 1);
+    const b = view[i];
+    const x = xOf(i), y = yOf(b.c);
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = "rgba(233,238,251,.38)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, padT); ctx.lineTo(Math.round(x) + 0.5, volBase); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(padL + plotW, Math.round(y) + 0.5); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#e9eefb";
+    ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+    const lab = won(b.c);
+    ctx.font = "9.5px " + font;
+    const tw = Math.min(ctx.measureText(lab).width + 6, padR - 2);
+    ctx.fillStyle = "#1d2a41";
+    ctx.fillRect(padL + plotW + 2, y - 7.5, tw, 15);
+    ctx.fillStyle = "#e9eefb";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(lab, padL + plotW + 4, y);
+    ctx.fillStyle = "rgba(233,238,251,.9)";
+    ctx.font = "9px " + font;
+    ctx.textBaseline = "bottom";
+    const dtxt = String(b.d);
+    const room = 46;
+    const centerOk = x > padL + room && x < padL + plotW - room;
+    ctx.textAlign = centerOk ? "center" : (x <= padL + room ? "left" : "right");
+    ctx.fillText(dtxt, centerOk ? x : (x <= padL + room ? padL : padL + plotW), cssH - 2);
+  }
+
+  chartState.geom = { n: n, view: view, vma: vma, step: step, padL: padL, padT: padT, priceH: priceH, plotW: plotW, w: cssW, h: cssH };
+}
+let chartResizeTimer = null;
+window.addEventListener("resize", () => {
+  if (!document.getElementById("candleChart")) return;
+  clearTimeout(chartResizeTimer);
+  chartResizeTimer = setTimeout(() => { chartState.hover = null; drawChart(); }, 120);
+});
+
 /* ══════════ 시트 동기화 ══════════ */
 async function syncSheet(manual) {
   const btn = $("#refreshBtn");
@@ -1314,6 +1729,7 @@ function openDetail(key) {
         '</div>' +
       '</div>' +
     '</div>' +
+    '<div class="card chartcard" id="chartCard" style="margin:12px 0">' + chartCardHTML(r) + '</div>' +
     '<div class="card" style="margin:12px 0">' +
       '<h3>세력선 지도</h3>' +
       '<p class="hint">현재가가 112·224·448선 사이 어디에 있는지. 초록 띠는 세 선이 겹친 구간.</p>' +
@@ -1357,6 +1773,8 @@ function openDetail(key) {
   $("#detail").classList.remove("hidden");
   document.body.style.overflow = "hidden";
   $("#detailInner").scrollTop = 0;
+  mountChart(r);
+  if (!chartState.byCode || !Object.keys(chartState.byCode).length) syncChart();
 }
 function closeDetail() {
   $("#detail").classList.add("hidden");
@@ -1554,6 +1972,7 @@ function renderSetup() {
     '<div class="syncline"><span>상태</span><b>' + esc(statusText) + '</b></div>' +
     '<div class="syncline"><span>기준일</span><b>' + esc(base || "—") + '</b></div>' +
     '<div class="syncline"><span>종목 수</span><b>' + rows.length + '개' + (state.custom.rows.length ? ' (내 수정 ' + state.custom.rows.length + ')' : '') + '</b></div>' +
+    '<div class="syncline"><span>일봉 차트</span><b>' + esc(chartStatusText()) + '</b></div>' +
     '<div class="syncline"><span>마지막 동기화</span><b>' + agoText(st.fetchedAt) + '</b></div>' +
     (st.error ? '<div class="syncline"><span>오류</span><b style="color:var(--red)">' + esc(st.error) + '</b></div>' : '') +
     '<div class="curl">' + esc(CSV_PRIMARY) + '</div>' +
@@ -1573,6 +1992,7 @@ function renderSetup() {
     '데이터: <a href="' + SHEET_URL + '" target="_blank" rel="noopener" style="color:var(--teal)">단테-세력선-추천</a> 구글 시트 (기준일 ' + esc(base || "—") + '). ' +
     '매매일지·설정은 이 브라우저(localStorage)에만 저장돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
+    '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4. PER·PBR은 최근 분기 실적(TTM), ROE·부채비율은 2025 사업연도 결산 기준(2026-11-22 네이버금융 조회).<br>' +
     '매매 권유가 아닌 판단 보조 자료야. 11/23(월) 개장 후 수치는 달라지고, 삼진제약은 11/23 기자간담회 결과에 따라 갭이 날 수 있어. 손절선은 꼭 같이 걸어둬.';
   const dl = $("#stockList");
@@ -1629,6 +2049,34 @@ document.addEventListener("click", (ev) => {
   }
   if (act === "detail") { openDetail(code); return; }
   if (act === "closeDetail") { closeDetail(); return; }
+  if (act === "chartToggle") {
+    const k = el.dataset.k;
+    if (!(k in chartState.on)) return;
+    chartState.on[k] = !chartState.on[k];
+    store.set(LS.chartUi, { days: chartState.days, on: chartState.on });
+    el.classList.toggle("on", !!chartState.on[k]);
+    el.style.color = chartState.on[k] ? (k === "guide" ? "#e9eefb" : CHART_MA[k].c) : "";
+    chartState.hover = null;
+    const tip = document.getElementById("chartTip"); if (tip) tip.classList.add("hidden");
+    drawChart();
+    return;
+  }
+  if (act === "chartPeriod") {
+    const d = Number(el.dataset.days) || 120;
+    chartState.days = d;
+    store.set(LS.chartUi, { days: chartState.days, on: chartState.on });
+    $$("#chartCard .chart-period button").forEach(b => b.classList.toggle("on", Number(b.dataset.days) === d));
+    const hint = $("#chartCard .hint");
+    const bars = chartState.data || [];
+    if (hint && bars.length) {
+      const win = bars.slice(Math.max(0, bars.length - d));
+      hint.textContent = "최근 " + win.length + "거래일 · " + win[0].d + " ~ " + win[win.length - 1].d + " · 종가 " + won(win[win.length - 1].c) + "원";
+    }
+    chartState.hover = null;
+    const tip2 = document.getElementById("chartTip"); if (tip2) tip2.classList.add("hidden");
+    drawChart();
+    return;
+  }
   if (act === "journalFrom") {
     const r = findRow(code);
     closeDetail();
@@ -1935,7 +2383,7 @@ function resetAll() {
   state.journal = [];
   state.isa = { principal: 0, taxRate: 15.4, extraDiv: 0, targetMonthly: 1300000, autoDiv: true };
   state.custom = { mode: "merge", rows: [] };
-  Object.values(LS).forEach(k => { if (k !== LS.cache && k !== LS.ui) localStorage.removeItem(k); });
+  Object.values(LS).forEach(k => { if (k !== LS.cache && k !== LS.ui && k !== LS.chart && k !== LS.chartUi) localStorage.removeItem(k); });
   store.set(LS.isa, state.isa);
   resetJournalForm(); resetStockForm(); renderAll();
   toast("내 기록을 지웠어");
@@ -1966,9 +2414,21 @@ function boot() {
   }
   $("#jDate").value = todayStr();
   state.edit.jType = "buy";
+  const cu = store.get(LS.chartUi, null);
+  if (cu) {
+    if (cu.days === 60 || cu.days === 120) chartState.days = cu.days;
+    if (cu.on) chartState.on = Object.assign({}, chartState.on, cu.on);
+  }
+  const cc = store.get(LS.chart, null);
+  if (cc && cc.byCode && Object.keys(cc.byCode).length) {
+    chartState.byCode = cc.byCode;
+    chartState.status = "cache";
+    chartState.fetchedAt = cc.fetchedAt || null;
+  }
   setTab(state.ui.tab || "reco");
   renderAll();
   syncSheet(false);
+  syncChart();
 }
 
 boot();
