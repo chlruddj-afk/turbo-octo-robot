@@ -1007,6 +1007,7 @@ const fx = (v, d) => {
   const s = Number(v).toFixed(d == null ? 2 : d);
   return s.indexOf(".") >= 0 ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
 };
+const fxInt = (v) => (v == null || isNaN(v)) ? "—" : Math.round(Number(v)).toLocaleString("ko-KR");
 const capText = (v) => v == null ? "—" : (v >= 10000 ? fx(v / 10000, 1) + "조원" : Math.round(v).toLocaleString("ko-KR") + "억원");
 const capSize = (v) => v == null ? "" : v >= 100000 ? "초대형" : v >= 30000 ? "대형" : v >= 5000 ? "중형" : "소형";
 
@@ -2031,7 +2032,7 @@ function fundCardHTML(r, m) {
     metricRow("PBR", "주가순자산비율", f.pbr == null ? "—" : fx(f.pbr, 2) + "배", f.pbrB, "회사 재산 대비 주가. 1배 아래면 재산보다 싸게 거래") +
     metricRow("ROE", "자기자본이익률", f.roe == null ? "—" : fx(f.roe, 2) + "%", f.roeB, "내 돈 굴려 얼마나 벌었나. 10% 이상이면 알짜") +
     metricRow("부채비율", "빚 비율", f.debt == null ? "—" : fx(f.debt, 1) + "%", f.debtB, "100% 아래면 탄탄, 200% 넘으면 주의") +
-    metricRow("유보율", "사내 유보금", r.reserve == null ? "—" : fx(r.reserve, 0) + "%", reserveBadge(r.reserve), "자본금 대비 쌓아둔 유보금. 300%를 넘으면 배당·위기에 쓸 여유가 있다는 뜻") +
+    metricRow("유보율", "사내 유보금", r.reserve == null ? "—" : fxInt(r.reserve) + "%", reserveBadge(r.reserve), "자본금 대비 쌓아둔 유보금. 300%를 넘으면 배당·위기에 쓸 여유가 있다는 뜻") +
     metricRow("최대주주", "지분율(특수관계인 포함)", r.major == null ? "—" : fx(r.major, 2) + "%", majorBadge(r.major), "최대주주 쪽 지분. 30% 이상이면 경영권이 안정적") +
     metricRow("시가총액", "회사 덩치", capText(f.mcap), { t: capSize(f.mcap) || "—", c: f.mcap == null ? "gray" : "blue" }, "주가 × 상장주식수. 덩치가 클수록 하루 흔들림이 작아");
   let trendHTML = "";
@@ -2070,7 +2071,7 @@ function safeCardHTML(r, f) {
       v: f.debt == null ? "—" : fx(f.debt, 1) + "%",
       d: "빚이 자기자본보다 많으면 금리가 오를 때 흔들려" },
     { ok: r.reserve != null && r.reserve >= 300, name: "유보율 충분(300% 이상)",
-      v: r.reserve == null ? "—" : fx(r.reserve, 0) + "%",
+      v: r.reserve == null ? "—" : fxInt(r.reserve) + "%",
       d: "자본금보다 유보금이 두세 배는 쌓여 있어야 배당도, 위기도 버터" },
     { ok: r.major != null && r.major >= 30, name: "최대주주 지분 확실(30% 이상)",
       v: r.major == null ? "—" : fx(r.major, 2) + "%",
@@ -2079,9 +2080,9 @@ function safeCardHTML(r, f) {
   const pass = items.filter(i => i.ok).length;
   const tone = pass === 3 ? "good" : pass === 2 ? "info" : "warn";
   const verdict = pass === 3 ? "세 가지 다 통과 — 재무는 걱정 없어"
-    : pass === 2 ? "2개 통과 · 약한 항목만 기억하고 비중을 조절해"
-    : pass === 1 ? "1개만 통과 — 재무 쪽은 보수적으로 봐야 해"
-    : "재무 3원칙을 거의 못 넘었어 — 관찰만 하자";
+    : pass === 2 ? "약한 항목만 기억하고 비중을 조절해"
+    : pass === 1 ? "재무 쪽은 보수적으로 봐야 해"
+    : "3원칙을 거의 못 넘었어 — 관찰만 하자";
   return '<div class="card" style="margin:12px 0">' +
     '<h3>🛡️ 재무 안정성 체크 (김종봉 3원칙)</h3>' +
     '<p class="hint">점수와 별개로, 사기 전에 눈으로 확인하는 세 가지야.</p>' +
