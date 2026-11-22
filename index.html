@@ -579,7 +579,8 @@ const LS = {
   journal:"dante.journal.v1",
   isa:    "dante.isa.v1",
   custom: "dante.custom.v1",
-  ui:     "dante.ui.v1"
+  ui:     "dante.ui.v1",
+  uiTotal:"dante.ui.sorttotal.v1"
 };
 
 /* ── 시트를 못 읽을 때 쓰는 기본 데이터(2026-11-20 종가) ── */
@@ -621,7 +622,7 @@ const state = {
   journal: [],
   isa: { principal:0, taxRate:15.4, extraDiv:0, targetMonthly:1300000, autoDiv:true },
   custom: { mode:"merge", rows:[] },
-  ui: { tab:"reco", filter:"all", sort:"total", v:2 },
+  ui: { tab:"reco", filter:"all", sort:"total" },
   edit: { journalId:null, jType:"buy", stockCode:null },
   paste: { rows:null }
 };
@@ -1943,8 +1944,13 @@ function boot() {
   state.isa = Object.assign({ principal: 0, taxRate: 15.4, extraDiv: 0, targetMonthly: 1300000, autoDiv: true }, store.get(LS.isa, {}));
   state.custom = Object.assign({ mode: "merge", rows: [] }, store.get(LS.custom, {}));
   const savedUi = store.get(LS.ui, null);
-  state.ui = Object.assign({ tab: "reco", filter: "all", sort: "total", v: 2 }, savedUi || {});
-  if (!savedUi || savedUi.v !== 2) { state.ui.sort = "total"; state.ui.v = 2; store.set(LS.ui, state.ui); }
+  state.ui = Object.assign({ tab: "reco", filter: "all", sort: "total" }, savedUi || {});
+  /* 총 매력도 정렬이 생기기 전의 저장값은 한 번만 새 기본 정렬로 옮긴다 */
+  if (!store.get(LS.uiTotal, false)) {
+    state.ui.sort = "total";
+    store.set(LS.uiTotal, true);
+    store.set(LS.ui, state.ui);
+  }
   const cache = store.get(LS.cache, null);
   if (cache && cache.rows && cache.rows.length) {
     state.sheet.rows = cache.rows.map(r => ({ ...r, src: "sheet" }));
