@@ -366,7 +366,7 @@ table.t tr:last-child td{border-bottom:none}
 .gloss .grow span{flex:0 0 46px;font-size:9.5px;color:var(--dim)}
 .gloss .grow i{flex:1;font-style:normal;color:var(--muted);font-size:11px}
 
-/* ── 총 매력도(세력선 60% + 기업체력 40%) ── */
+/* ── 총 매력도(4:4:2 수급 40 · 세력선 40 · 기업체력 20) ── */
 .tscore{display:flex;align-items:center;gap:13px;margin-top:12px}
 .tgauge{--p:50;--c:var(--teal);position:relative;width:76px;height:76px;flex:0 0 76px;border-radius:50%;
   background:conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,.07) 0);display:grid;place-items:center}
@@ -377,9 +377,10 @@ table.t tr:last-child td{border-bottom:none}
 .tbars{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
 .tblab{font-size:9px;font-weight:800;color:var(--dim);letter-spacing:.02em;margin-bottom:-2px}
 .tbar{display:flex;align-items:center;gap:7px}
-.tbar span{flex:0 0 46px;font-size:10px;font-weight:800;color:var(--dim);letter-spacing:-0.01em}
+.tbar span{flex:0 0 60px;font-size:9.5px;font-weight:800;color:var(--dim);letter-spacing:-0.02em}
 .tbar i{flex:1;height:6px;border-radius:3px;background:#1b2740;overflow:hidden}
 .tbar i b{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#1fae8f,#31d0aa)}
+.tbar.s i b{background:linear-gradient(90deg,#6a56d6,#9b7bff)}
 .tbar.f i b{background:linear-gradient(90deg,#3b6fd4,#5b9cff)}
 .tbar em{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:800;color:var(--text);letter-spacing:-0.02em}
 .tbar em small{font-size:8.5px;font-weight:700;color:var(--dim);margin-left:3px;letter-spacing:0}
@@ -536,7 +537,7 @@ table.t tr:last-child td{border-bottom:none}
         <div class="grow"><b>유보율</b><span>사내 유보금</span><i>자본금 대비 쌓아둔 유보금. 300% 이상이면 배당·위기에 쓸 여유가 있다는 뜻</i></div>
         <div class="grow"><b>최대주주</b><span>지분율</span><i>최대주주+특수관계인 지분. 30% 이상이면 경영권이 안정적</i></div>
         <div class="grow"><b>눌림 거래량</b><span>김정수</span><i>매집봉 뒤 거래량이 1/3 이하로 말라면 세력이 안 빠졌다는 신호</i></div>
-        <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10.<br>총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 + RS 보정(±10). 위 카드에서 세력선·기업체력 점수를 나란히 보면 “차트는 좋은데 재무가 어떤지” 한눈에 보여.<br>나가는 기준은 1차 +20%에서 절반 익절, -7%나 224선 이탈이면 교체.</p>
+        <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10).<br>총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2, 100점 만점). 위 카드에서 수급·세력선·기업체력 점수를 나란히 보면 “세력이 붙었는데 재무가 어떤지” 한눈에 보여.<br>나가는 기준은 1차 +20%에서 절반 익절, -7%나 224선 이탈이면 교체.</p>
       </div>
     </section>
 
@@ -726,7 +727,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const LS = {
   cache:  "dante.reco.cache.v1",
@@ -1236,57 +1237,222 @@ function rsGradeOf(r) {
   return s >= 60 ? "강함" : s >= 40 ? "보통" : "약함";
 }
 const rsClass = (g) => /강/.test(g) ? "s1" : /약/.test(g) ? "s3" : "s2";
-/* RS 보정점: 50점 기준에서 5점당 ±1점, 최대 ±10점 */
-function rsAdj(r) {
-  const s = rsScore(r);
-  if (s == null) return 0;
-  return clamp(Math.round((s - 50) / 5), -10, 10);
-}
 function rsBadgeHTML(r) {
   if (rsScore(r) == null) return '<span class="tag">RS 자료 없음</span>';
   return '<span class="tag t-violet">코스피 대비 ' + pct(r.rs20, 1) + 'p · ' + esc(rsGradeOf(r)) + '</span>';
 }
 
-/* ══════════ 총 매력도 = 세력선 60% + 기업체력 40% + RS 보정(±10) ══════════ */
-const TOTAL_W_CHART = 0.6, TOTAL_W_FUND = 0.4;
-/* 재무 지표가 비어 있으면 세력선 점수만으로 대신한다 */
-function totalOf(r) {
-  const m = metrics(r), f = fundMetrics(r);
-  const rs = rsScore(r), adj = rsAdj(r);
-  const base = f.total == null ? m.total : m.total * TOTAL_W_CHART + f.total * TOTAL_W_FUND;
-  const total = Math.round(clamp(base + adj, 0, 100));
-  return { m, f, rs, rsAdj: adj, total, base,
-           chartPart: m.total * TOTAL_W_CHART,
-           fundPart: f.total == null ? null : f.total * TOTAL_W_FUND };
+/* ══════════ v1.7.0 총 매력도 = 4 : 4 : 2 (수급 40 · 세력선 40 · 기업체력 20) ══════════
+   세 기둥을 각각 0~100점으로 만들고 가중 합산한다(100점 만점).
+   수급 40 = 코스피 대비 RS + 눌림 거래량 급감 + 단테형 매집·수급 신호 − 위험경고
+   세력선 40 = 112·224·448 수렴·정배열·이격도 + 단테 밥그릇 자리
+   기업체력 20 = PER·PBR·ROE·부채비율·3년 흑자 + 유보율·최대주주 안정성 */
+const TOTAL_W_SUPPLY = 0.4, TOTAL_W_LINE = 0.4, TOTAL_W_FUND = 0.2;
+
+/* ── 단테 밥그릇 자리 판별 (차트데이터 120봉) ──
+   1번 하락·투매 / 2번 바닥 횡보 / 3번 224선 돌파·눌림(핵심 타점) / 4번 급등 추격 */
+const bowlCache = new Map();
+function bowlOf(r) {
+  const key = [r.code, r.price, r.ma112, r.ma224, r.ma448, r.conv, chartState.fetchedAt || 0].join("|");
+  const hit = bowlCache.get(key);
+  if (hit) return hit;
+  const v = bowlCalc(r);
+  bowlCache.set(key, v);
+  return v;
 }
-function totalScore(r) { return totalOf(r).total; }
-/* 등급·판정도 총 매력도 기준으로 통일 */
+function bowlCalc(r) {
+  const bars = barsFor(r);
+  const last = (bars && bars.length) ? bars[bars.length - 1] : null;
+  const price = r.price || (last && last.c) || null;
+  const ma224 = r.ma224 || (last && last.m224) || null;
+  if (!price || !ma224) {
+    return { seat: 0, name: "판별 불가", adj: 0, dev: null, src: "none",
+             note: "224일선 값이 없어 밥그릇 자리를 판별하지 못했어." };
+  }
+  const dev = (price - ma224) / ma224 * 100;
+  let slope = null, fromLow = null, crossGap = null;
+  if (bars && bars.length >= 60) {
+    const n = bars.length;
+    const prev = bars[Math.max(0, n - 21)];
+    if (prev && prev.m224 && last.m224) slope = (last.m224 - prev.m224) / prev.m224 * 100;
+    const win = bars.slice(Math.max(0, n - 120));
+    const lo = Math.min.apply(null, win.map(b => (b.l == null ? b.c : b.l)).filter(v => v != null));
+    if (lo && isFinite(lo) && lo > 0) fromLow = (price - lo) / lo * 100;
+    for (let i = n - 1; i >= 1 && i >= n - 60; i--) {
+      const b = bars[i], p = bars[i - 1];
+      if (b.m224 != null && p.m224 != null && p.c <= p.m224 && b.c > b.m224) { crossGap = n - 1 - i; break; }
+    }
+  }
+  const conv = r.conv == null ? 99 : r.conv;
+  const aboveAll = !!(r.ma112 && r.ma224 && r.ma448) && price > Math.max(r.ma112, r.ma224, r.ma448);
+  const freshCross = crossGap != null && crossGap <= 60;
+  const src = (bars && bars.length >= 60) ? "chart" : "row";
+  const lowTxt = fromLow == null ? "" : " · 바닥 대비 +" + fx(fromLow, 0) + "%";
+  const crossTxt = crossGap == null
+    ? (conv <= 5 && aboveAll ? " · 세 선 " + fx(conv, 1) + "% 수렴·세 선 위" : "")
+    : " · " + crossGap + "거래일 전 224선 돌파";
+
+  /* 4번 — 급등 추격 */
+  if (dev >= 25 || (fromLow != null && fromLow >= 100)) {
+    return { seat: 4, name: "4번 급등 추격", adj: -15, dev, fromLow, slope, crossGap, src,
+             note: "224선 위 " + fx(dev, 1) + "%" + lowTxt + " — 단테 기준으로 여기서부터는 추격 금지야." };
+  }
+  /* 3번 — 224선 돌파 뒤 눌림(핵심 타점). 세 선이 붙은 채 위에 있으면 돌파 완료로 본다 */
+  if ((freshCross || (conv <= 5 && aboveAll)) && dev >= -4 && dev <= 15) {
+    const adj = dev > 8 ? 4 : dev > 3 ? 8 : 12;
+    const name = crossGap == null ? "3번 세 선 수렴 돌파" : dev > 8 ? "3번 돌파 뒤 연장" : dev > 3 ? "3번 돌파 초입" : "3번 224선 돌파·눌림";
+    return { seat: 3, name, adj, dev, fromLow, slope, crossGap, src,
+             note: "224선 위 " + fx(dev, 1) + "%" + crossTxt + " — 단테 3번 자리(핵심 타점)야." };
+  }
+  /* 2번 — 224선이 평평한 바닥 횡보 */
+  if (dev <= 0 && dev >= -12 && (slope == null || Math.abs(slope) <= 4) && (fromLow == null || fromLow <= 25)) {
+    return { seat: 2, name: "2번 바닥 횡보", adj: 3, dev, fromLow, slope, crossGap, src,
+             note: "224선 아래 " + fx(Math.abs(dev), 1) + "%에서 세력선이 평평" + lowTxt + " — 바닥을 다지는 2번 자리라 224선 돌파를 기다리는 구간이야." };
+  }
+  /* 1번 — 224선이 내려오는 하락·투매 */
+  if (dev < -12) {
+    return { seat: 1, name: "1번 하락·투매", adj: -12, dev, fromLow, slope, crossGap, src,
+             note: "224선 아래 " + fx(Math.abs(dev), 1) + "%" + (slope == null ? "" : " · 224선 기울기 " + fx(slope, 1) + "%") + " — 아직 1번 하락 구간이야." };
+  }
+  return { seat: 0, name: "자리 확인 중", adj: 0, dev, fromLow, slope, crossGap, src,
+           note: "224선 위 " + fx(dev, 1) + "%" + crossTxt + lowTxt + " — 3번 타점에서 조금 지난 자리라 눌림을 기다려." };
+}
+
+/* ── 수급 40% (0~100) ──
+   RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고 */
+function supplyOf(r) {
+  const rs = rsScore(r);
+  const rsPart = rs == null ? 17.5 : clamp(rs / 100 * 35, 0, 35);
+  const pv = r.pullVol;
+  const pullPart = pv == null ? 12
+    : pv <= 33 ? 25
+    : pv <= 60 ? 25 - (pv - 33) / 27 * 15
+    : pv <= 100 ? 10 - (pv - 60) / 40 * 10
+    : 0;
+  const bars = r.bars || 0, mult = r.maxMult || 0;
+  const freqPart = clamp(Math.min(bars / 6, 1) * 12, 0, 12);
+  const powerPart = clamp(Math.min(mult / 6, 1) * 8, 0, 8);
+
+  /* 차트데이터 기반: 바닥·박스권 매집봉 빈도와 단기 추세 돌파 양봉 */
+  const cb = barsFor(r);
+  let boxAcc = null, brk = null, boxPart = 5, brkPart = 5;
+  if (cb && cb.length >= 40) {
+    boxAcc = 0;
+    for (let i = Math.max(20, cb.length - 120); i < cb.length; i++) {
+      const b = cb[i];
+      let s = 0;
+      for (let k = i - 20; k < i; k++) s += (cb[k].v || 0);
+      const avg = s / 20;
+      if (avg > 0 && b.v >= avg * 2 && b.c > b.o && (b.m224 == null || b.c <= b.m224 * 1.12)) boxAcc++;
+    }
+    boxPart = clamp(Math.min(boxAcc / 6, 1) * 10, 0, 10);
+    for (let i = cb.length - 20; i < cb.length; i++) {
+      if (i < 20) continue;
+      const b = cb[i];
+      let s = 0;
+      for (let k = i - 20; k < i; k++) s += (cb[k].v || 0);
+      const avg = s / 20;
+      let priorHi = 0;
+      for (let k = i - 20; k < i; k++) priorHi = Math.max(priorHi, cb[k].h || cb[k].c || 0);
+      if (priorHi && b.c > priorHi && b.v >= avg * 1.2) brk = { d: b.d, c: b.c };
+    }
+    if (brk) brkPart = (r.price != null && r.price >= brk.c) ? 10 : 5;
+    else brkPart = 0;
+  }
+
+  const w = warnList(r);
+  let warnAdj = 0, warnHit = [];
+  if (w.some(x => /장대음봉/.test(x))) { warnAdj += 8; warnHit.push("장대음봉"); }
+  if (w.some(x => /윗꼬리/.test(x))) { warnAdj += 6; warnHit.push("윗꼬리 음봉"); }
+  if (w.some(x => /2배|급등/.test(x))) { warnAdj += 5; warnHit.push("단기 급등"); }
+  if (low52Flag(r)) { warnAdj += 8; warnHit.push("52주 신저가"); }
+
+  const total = Math.round(clamp(rsPart + pullPart + freqPart + powerPart + boxPart + brkPart - warnAdj, 0, 100));
+  return { total, rs, rsPart, pullPart, freqPart, powerPart, boxPart, brkPart, boxAcc, brk, warnAdj, warnHit,
+           hasChart: !!(cb && cb.length >= 40) };
+}
+function bowlShort(b) {
+  if (!b || !b.seat) return "—";
+  return ({ 1: "1번 하락", 2: "2번 바닥", 3: "3번 돌파·눌림", 4: "4번 추격" })[b.seat] || "—";
+}
+function supplyNote(r, s) {
+  const bits = [];
+  if (s.rs != null) bits.push("RS " + s.rs + "점");
+  if (r.pullVol != null) bits.push("눌림 거래량 " + fx(r.pullVol, 1) + "%" + (r.pullVol <= 33 ? " 급감" : ""));
+  if (r.bars) bits.push("매집봉 " + r.bars + "회" + (r.maxMult ? " " + fx(r.maxMult, 1) + "배" : ""));
+  if (s.hasChart) {
+    if (s.boxAcc != null) bits.push("바닥·박스권 매집 " + s.boxAcc + "회");
+    bits.push(s.brk ? "추세 돌파 양봉 있음" : "추세 돌파 양봉 없음");
+  }
+  if (s.warnAdj) bits.push("위험경고 −" + s.warnAdj);
+  return bits.join(" · ");
+}
+
+/* ── 세력선 40% (0~100): 기존 수렴·이격·매집 점수 + 정배열 보정 + 밥그릇 자리 ── */
+function lineOf(r) {
+  const m = metrics(r);
+  const bowl = bowlOf(r);
+  let trendAdj = 0;
+  if (m.trend === "정배열 진입") trendAdj = 6;
+  else if (m.trend === "112·224선 위") trendAdj = 3;
+  else if (m.trend === "224선 위") trendAdj = 1;
+  else if (m.trend === "역배열") trendAdj = -5;
+  const total = Math.round(clamp(m.total + trendAdj + bowl.adj, 0, 100));
+  return { ...m, base: m.total, trendAdj, bowl, total };
+}
+
+/* ── 기업체력 20% (0~100): 기존 재무 점수 + 유보율·최대주주 안정성 ── */
+function fundOf(r) {
+  const f = fundMetrics(r);
+  const rv = r.reserve, mj = r.major;
+  const resAdj = rv == null || isNaN(rv) ? 0 : rv >= 300 ? 5 : rv >= 100 ? 2 : rv < 0 ? -8 : 0;
+  const majAdj = mj == null || isNaN(mj) ? 0 : mj >= 30 ? 5 : mj >= 20 ? 2 : mj < 15 ? -5 : 0;
+  const total = f.total == null ? null : Math.round(clamp(f.total + resAdj + majAdj, 0, 100));
+  const verdict = total == null ? "자료 없음" : total >= 85 ? "아주 튼튼" : total >= 70 ? "튼튼" : total >= 55 ? "보통" : total >= 40 ? "주의" : "위험";
+  const tone = total == null ? "low" : total >= 70 ? "" : total >= 55 ? "mid" : "low";
+  return { ...f, base: f.total, resAdj, majAdj, total, verdict, tone };
+}
+
+/* 재무 지표가 비어 있으면 수급·세력선 둘로 나눠 대신한다 */
+function totalOf(r) {
+  const sup = supplyOf(r), line = lineOf(r), fund = fundOf(r);
+  const base = fund.total == null
+    ? sup.total * 0.5 + line.total * 0.5
+    : sup.total * TOTAL_W_SUPPLY + line.total * TOTAL_W_LINE + fund.total * TOTAL_W_FUND;
+  const total = (sup.total == null && line.total == null && fund.total == null) ? null : Math.round(clamp(base, 0, 100));
+  return { sup, line, fund, total, base,
+           supplyPart: sup.total * TOTAL_W_SUPPLY,
+           linePart: line.total * TOTAL_W_LINE,
+           fundPart: fund.total == null ? null : fund.total * TOTAL_W_FUND };
+}
+function totalScore(r) { const t = totalOf(r).total; return t == null ? 0 : t; }
+/* 등급·판정도 총 매력도(4:4:2) 기준 — 88~95가 현실적 상단이라 86부터 A+로 둔다 */
 function totalGrade(t) {
   if (t == null) return "—";
-  if (t >= 90) return "A+";
-  if (t >= 85) return "A";
-  if (t >= 80) return "B+";
-  if (t >= 72) return "B";
-  if (t >= 64) return "C+";
-  if (t >= 55) return "C";
+  if (t >= 86) return "A+";
+  if (t >= 81) return "A";
+  if (t >= 76) return "B+";
+  if (t >= 70) return "B";
+  if (t >= 62) return "C+";
+  if (t >= 54) return "C";
   return "D";
 }
 function totalVerdict(t) {
   if (t == null) return "자료 없음";
-  if (t >= 90) return "최우선 후보";
-  if (t >= 85) return "농사 지을 만한 자리";
-  if (t >= 78) return "눌림 오면 분할";
-  if (t >= 68) return "지켜보기";
+  if (t >= 86) return "최우선 후보";
+  if (t >= 81) return "농사 지을 만한 자리";
+  if (t >= 74) return "눌림 오면 분할";
+  if (t >= 66) return "지켜보기";
   return "관찰만";
 }
 
 /* 차트(세력선) vs 재무(기업 체력) 한 줄 판정 */
 function compareVerdict(chart, fund) {
-  if (fund == null) return { cls: "info", text: "재무 지표가 없어 차트만으로 판단 — 설정에서 PER·PBR을 넣을 수 있어" };
-  const cg = chart >= 75, fg = fund >= 70;
-  if (cg && fg) return { cls: "good", text: "차트·재무 둘 다 좋아 — 농사 지을 만한 자리" };
-  if (cg && !fg) return { cls: "warn", text: "차트는 좋은데 재무가 약해 — 비중 줄이고 손절 짧게" };
-  if (!cg && fg) return { cls: "info", text: "재무는 알찬데 차트가 아직 — 224선 눌림 기다리기" };
+  if (fund == null) return { cls: "info", text: "재무 지표가 없어 수급·세력선만으로 판단 — 설정에서 PER·PBR을 넣을 수 있어" };
+  const cg = chart >= 78, fg = fund >= 70;
+  if (cg && fg) return { cls: "good", text: "세력선·재무 둘 다 좋아 — 농사 지을 만한 자리" };
+  if (cg && !fg) return { cls: "warn", text: "세력선은 좋은데 재무가 약해 — 비중 줄이고 손절 짧게" };
+  if (!cg && fg) return { cls: "info", text: "재무는 알찬데 세력선이 아직 — 224선 눌림 기다리기" };
   if (chart >= 65 && fund >= 60) return { cls: "info", text: "둘 다 중간 — 순서를 미뤄두고 지켜보기" };
   return { cls: "bad", text: "둘 다 약해 — 지금은 관찰만" };
 }
@@ -1379,6 +1545,7 @@ function parseChartRows(text) {
 }
 async function syncChart() {
   if (chartState.status === "loading") return;
+  const hadChart = !!(chartState.byCode && Object.keys(chartState.byCode).length);
   chartState.status = "loading";
   refreshChartCard();
   try {
@@ -1398,6 +1565,16 @@ async function syncChart() {
   }
   refreshChartCard();
   renderSetup();
+  /* 차트가 새로 들어오면 밥그릇 자리·수급 점수가 정밀해지므로 점수 화면을 다시 그린다 */
+  if (chartState.status === "live") {
+    bowlCache.clear();
+    renderHero();
+    renderReco();
+    const sheet = document.getElementById("detail");
+    if (!hadChart && sheet && !sheet.classList.contains("hidden") && chartState.row) {
+      openDetail(chartState.row.code || chartState.row.name);
+    }
+  }
 }
 function barsFor(r) {
   if (!r) return null;
@@ -1964,9 +2141,9 @@ function fmCell(label, value, badge) {
 }
 function cardHTML(r, pos) {
   const o = totalOf(r);
-  const m = o.m, f = o.f, t = o.total;
-  const cv = compareVerdict(m.total, f.total);
-  const dev = m.dev224;
+  const s = o.sup, ln = o.line, f = o.fund, t = o.total;
+  const cv = compareVerdict(ln.total, f.total);
+  const dev = ln.dev224;
   const place = pos == null ? r.rank : pos;
   const rankCls = place === 1 ? "r1" : place === 2 ? "r2" : "";
   return '<button class="scard' + (place === 1 ? " top1" : "") + '" data-act="detail" data-code="' + esc(r.code || r.name) + '">' +
@@ -1983,19 +2160,20 @@ function cardHTML(r, pos) {
     '</div>' +
     '<div class="rsline">' + rsBadgeHTML(r) +
       (r.rs60 != null ? '<span>60일 <b>' + pct(r.rs60, 1) + 'p</b></span>' : '') +
-      (o.rs != null ? '<span>RS 점수 <b>' + o.rs + '</b> · 총매력도 보정 <b>' + (o.rsAdj > 0 ? '+' : '') + o.rsAdj + '</b></span>' : '') +
+      (o.sup.rs != null ? '<span>RS 점수 <b>' + o.sup.rs + '</b> → 수급 ' + s.total + '점</span>' : '') +
     '</div>' +
     '<div class="sigrow">' + sigHTML(r) + sigExtraHTML(r) + '</div>' +
     '<div class="tscore">' +
       '<div class="tgauge ' + gaugeClass(t) + '" style="--p:' + t + '"><span><b>' + t + '</b><small>총 매력도</small></span></div>' +
       '<div class="tbars">' +
-        '<div class="tblab">세력선 60% + 기업체력 40%' + (o.rs != null ? ' + RS 보정 ' + (o.rsAdj > 0 ? "+" : "") + o.rsAdj : '') + '</div>' +
-        '<div class="tbar c"><span>세력선</span><i><b style="width:' + clamp(m.total, 0, 100) + '%"></b></i><em>' + m.total + '<small>60%</small></em></div>' +
-        '<div class="tbar f"><span>기업체력</span><i><b style="width:' + clamp(f.total || 0, 0, 100) + '%"></b></i><em>' + (f.total == null ? "—" : f.total) + '<small>40%</small></em></div>' +
+        '<div class="tblab">4:4:2 · 수급 40 + 세력선 40 + 기업체력 20</div>' +
+        '<div class="tbar s"><span>수급 40%</span><i><b style="width:' + clamp(s.total, 0, 100) + '%"></b></i><em>' + s.total + '</em></div>' +
+        '<div class="tbar c"><span>세력선 40%</span><i><b style="width:' + clamp(ln.total, 0, 100) + '%"></b></i><em>' + ln.total + '</em></div>' +
+        '<div class="tbar f"><span>기업체력 20%</span><i><b style="width:' + clamp(f.total || 0, 0, 100) + '%"></b></i><em>' + (f.total == null ? "—" : f.total) + '</em></div>' +
       '</div>' +
     '</div>' +
     '<div class="sc-mid" style="margin-top:12px">' +
-      '<div class="rowline"><b>' + esc(m.trend) + '</b><span>수렴 ' + pctAbs(m.conv, 1) + '</span></div>' +
+      '<div class="rowline"><b>' + esc(ln.trend) + '</b><span>수렴 ' + pctAbs(ln.conv, 1) + ' · 밥그릇 ' + bowlShort(ln.bowl) + '</span></div>' +
       lineMapHTML(r, true) +
     '</div>' +
     '<div class="fundmini">' +
@@ -2006,8 +2184,8 @@ function cardHTML(r, pos) {
     '</div>' +
     '<div class="tline">총 매력도 <b>' + t + '점</b> — ' + cv.text + '</div>' +
     '<div class="sc-chips">' +
-      '<span class="tag ' + (m.conv <= 3 ? "t-teal" : "") + '">세 선 수렴 ' + pctAbs(m.conv, 1) + '</span>' +
-      '<span class="tag ' + (m.bars >= 3 ? "t-amber" : "") + '">매집봉 ' + m.bars + '회</span>' +
+      '<span class="tag ' + (ln.conv <= 3 ? "t-teal" : "") + '">세 선 수렴 ' + pctAbs(ln.conv, 1) + '</span>' +
+      '<span class="tag ' + (ln.bars >= 3 ? "t-amber" : "") + '">매집봉 ' + ln.bars + '회</span>' +
       '<span class="tag t-blue">배당 ' + (r.div == null ? "—" : pctAbs(r.div, 2)) + '</span>' +
       (r.low52 != null ? '<span class="tag ' + (low52Flag(r) ? "t-red" : "") + '">52주저가 ' + pct(r.low52, 1) + '</span>' : "") +
       (marginFlag(r) === "credit" ? '<span class="tag t-teal">신용가능</span>' : (marginFlag(r) === "100" ? '<span class="tag t-amber">증거금100%</span>' : "")) +
@@ -2028,15 +2206,15 @@ function renderReco() {
     if (f === "top") return r.rank <= 5;
     if (f === "acc") return m.bars >= 3;
     if (f === "div") return (r.div || 0) >= 4;
-    if (f === "fund70") { const fm = fundMetrics(r); return fm.total != null && fm.total >= 70; }
+    if (f === "fund70") { const fm = fundOf(r); return fm.total != null && fm.total >= 70; }
     if (f === "rs") return rsScore(r) != null && rsScore(r) >= 60;
     if (f === "mine") return held.has(r.code || r.name);
     return true;
   });
   const s = state.ui.sort;
   if (s === "total") list.sort((a, b) => totalScore(b) - totalScore(a));
-  else if (s === "gauge") list.sort((a, b) => metrics(b).total - metrics(a).total);
-  else if (s === "fund") list.sort((a, b) => (fundMetrics(b).total == null ? -1 : fundMetrics(b).total) - (fundMetrics(a).total == null ? -1 : fundMetrics(a).total));
+  else if (s === "gauge") list.sort((a, b) => lineOf(b).total - lineOf(a).total);
+  else if (s === "fund") list.sort((a, b) => (fundOf(b).total == null ? -1 : fundOf(b).total) - (fundOf(a).total == null ? -1 : fundOf(a).total));
   else if (s === "conv") list.sort((a, b) => (metrics(a).conv) - (metrics(b).conv));
   else if (s === "div") list.sort((a, b) => (b.div || 0) - (a.div || 0));
   else if (s === "rank") list.sort((a, b) => a.rank - b.rank);
@@ -2061,12 +2239,12 @@ function renderRecoSummary(rows) {
   if (!xs.length) { el.className = "cmpv info"; el.textContent = ""; return; }
   const avg = Math.round(xs.reduce((a, x) => a + x.o.total, 0) / xs.length);
   const best = xs.slice().sort((a, b) => b.o.total - a.o.total)[0];
-  const strong = xs.filter(x => x.o.total >= 85).length;
-  const both = xs.filter(x => x.o.m.total >= 75 && x.o.f.total != null && x.o.f.total >= 70).map(x => x.r.name);
+  const strong = xs.filter(x => x.o.total >= 81).length;
+  const both = xs.filter(x => x.o.line.total >= 75 && x.o.fund.total != null && x.o.fund.total >= 70).map(x => x.r.name);
   el.className = "cmpv good";
   el.innerHTML = "평균 총 매력도 " + avg + "점 · 최고 " + esc(best.r.name) + " " + best.o.total + "점" +
-    " · 85점+ " + strong + "종목" +
-    (both.length ? " · 차트·재무 둘 다 좋은 " + both.length + "개" : "");
+    " · 81점+ " + strong + "종목" +
+    (both.length ? " · 세력선·재무 둘 다 좋은 " + both.length + "개" : "");
 }
 
 /* ══════════ 상세 시트 ══════════ */
@@ -2099,14 +2277,14 @@ function rsCardHTML(r) {
     '</div>' +
     '<div class="kv" style="margin-top:10px">' +
       '<div><span>RS 종합점수</span><b>' + s + '점 · ' + esc(g) + '</b></div>' +
-      '<div><span>총 매력도 보정</span><b class="' + (rsAdj(r) >= 0 ? "up" : "down") + '">' + (rsAdj(r) > 0 ? "+" : "") + rsAdj(r) + '점</b></div>' +
+      '<div><span>수급 40% 안 RS 몫</span><b>' + fx(supplyOf(r).rsPart, 1) + ' / 35점</b></div>' +
     '</div>' +
     '<div class="note">RS는 같은 기간 코스피 대비 초과 성과야. 시장이 무너질 때 덜 빠지거나 오르는 종목이 다음 상승장의 주도주가 되기 쉬워. 다만 시장이 강하게 반등하는 날은 그동안 버틴 종목이 쉬어갈 수 있으니, 1차 목표(+20%)에서 절반은 꼭 챙겨.</div>' +
-    '<p class="hint" style="margin:10px 2px 0">RS 종합점수 = 50 + 0.6×RS_20D + 0.4×RS_60D (50이 코스피와 같음). 등급 강함 60 이상 · 보통 40~59 · 약함 40 미만. 총매력도 보정은 50점에서 5점당 ±1점, 최대 ±10점.</p>' +
+    '<p class="hint" style="margin:10px 2px 0">RS 종합점수 = 50 + 0.6×RS_20D + 0.4×RS_60D (50이 코스피와 같음). 등급 강함 60 이상 · 보통 40~59 · 약함 40 미만. 총 매력도의 수급 40% 안에서 35점 몫을 차지하고, 나머지 65점은 뚤림 거래량·매집 신호·위험경고로 채워.</p>' +
   '</div>';
 }
 function fundCardHTML(r, m) {
-  const f = fundMetrics(r);
+  const f = fundOf(r);
   const tr = r.code ? FUND_TREND[r.code] : null;
   const barW = (v, max) => clamp(v / max * 100, 0, 100).toFixed(0) + "%";
   const rows =
@@ -2136,14 +2314,16 @@ function fundCardHTML(r, m) {
         '<div class="brk"><span>ROE</span><i style="--w:' + barW(f.roeS, 25) + '"></i><b>' + f.roeS.toFixed(0) + '</b></div>' +
         '<div class="brk"><span>부채비율</span><i style="--w:' + barW(f.debtS, 15) + '"></i><b>' + f.debtS.toFixed(0) + '</b></div>' +
         '<div class="brk"><span>흑자 가산</span><i style="--w:' + barW(f.profitS, 10) + '"></i><b>' + f.profitS.toFixed(0) + '</b></div>' +
+        '<div class="brk"><span>유보율 보정</span><i style="--w:' + barW(Math.max(0, f.resAdj), 5) + '"></i><b>' + (f.resAdj > 0 ? "+" : "") + f.resAdj + '</b></div>' +
+        '<div class="brk"><span>최대주주 보정</span><i style="--w:' + barW(Math.max(0, f.majAdj), 5) + '"></i><b>' + (f.majAdj > 0 ? "+" : "") + f.majAdj + '</b></div>' +
       '</div>' +
     '</div>' +
     '<div style="margin-top:14px">' + rows + '</div>' +
     trendHTML +
     '<div class="note">' + esc(fundComment(r, f, m)) + '</div>' +
-    '<p class="hint" style="margin:10px 2px 0">점수 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. ' +
+    '<p class="hint" style="margin:10px 2px 0">점수 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10, 여기에 유보율 300%↑(+5)·최대주주 30%↑(+5) 안정성 보정(최대 ±10)을 더해 0~100으로 잘라. ' +
       'PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회)이야. ' +
-      '유보율·최대주주 지분은 점수에 넣지 않고 체크리스트로만 보여줘 — 종목끼리 점수를 비교할 때 기준이 흔들리지 않게 하려는 거야.</p>' +
+      '이 점수가 총 매력도의 기업체력 20%가 돼.</p>' +
   '</div>';
 }
 /* ══════════ 김종봉 재무 안정성 3원칙 체크리스트 ══════════ */
@@ -2332,9 +2512,9 @@ function openDetail(key) {
   const r = findRow(key);
   if (!r) return;
   const o = totalOf(r);
-  const m = o.m, f = o.f, t = o.total, tg = totalGrade(t);
-  const cv = compareVerdict(m.total, f.total);
-  const dev = m.dev224;
+  const sup = o.sup, ln = o.line, f = o.fund, t = o.total, tg = totalGrade(t);
+  const cv = compareVerdict(ln.total, f.total);
+  const dev = ln.dev224;
   const buyGap = (b) => (b && r.price) ? ((b - r.price) / r.price * 100) : null;
   const stopGap = (r.stop && r.price) ? ((r.stop - r.price) / r.price * 100) : null;
   const barW = (v, max) => clamp(v / max * 100, 0, 100).toFixed(0) + "%";
@@ -2349,34 +2529,39 @@ function openDetail(key) {
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>총 매력도</h3>' +
       '<p class="hint">' + (f.total == null
-        ? '기업체력 지표가 비어 있어 세력선 점수만 반영했어.'
-        : '세력선 60% + 기업체력 40% + 상대강도 보정(±10) · 100점 만점') + '</p>' +
+        ? '기업체력 지표가 비어 있어 수급·세력선을 반씩 반영했어.'
+        : '수급 40% + 세력선 40% + 기업체력 20% (4:4:2) · 100점 만점') + '</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
         '<div class="big-gauge ' + gaugeClass(t) + '" style="--p:' + t + '"><span><b>' + t + '</b><small>총 매력도</small></span></div>' +
         '<div style="flex:1;min-width:0">' +
-          '<div class="brk w"><span>세력선 60%</span><i style="--w:' + barW(m.total, 100) + '"></i><b>' + fx(o.chartPart, 1) + '</b></div>' +
-          '<div class="brk w"><span>기업체력 40%</span><i style="--w:' + barW(f.total || 0, 100) + '"></i><b>' + (f.total == null ? "—" : fx(o.fundPart, 1)) + '</b></div>' +
-          '<div class="brk w"><span>RS 보정</span><i style="--w:' + barW(Math.abs(o.rsAdj), 10) + '"></i><b>' + (o.rs == null ? "—" : (o.rsAdj > 0 ? "+" : "") + o.rsAdj) + '</b></div>' +
+          '<div class="brk w"><span>수급 40%</span><i style="--w:' + barW(sup.total, 100) + '"></i><b>' + fx(o.supplyPart, 1) + '</b></div>' +
+          '<div class="brk w"><span>세력선 40%</span><i style="--w:' + barW(ln.total, 100) + '"></i><b>' + fx(o.linePart, 1) + '</b></div>' +
+          '<div class="brk w"><span>기업체력 20%</span><i style="--w:' + barW(f.total || 0, 100) + '"></i><b>' + (f.total == null ? "—" : fx(o.fundPart, 1)) + '</b></div>' +
           '<div class="tsum">' + (f.total == null
-            ? '세력선 ' + m.total + '점' + (o.rs == null ? '' : ' · RS 보정 ' + (o.rsAdj > 0 ? "+" : "") + o.rsAdj) + ' → <b>총 ' + t + '점</b>'
-            : '세력선 ' + m.total + ' × 0.6 = ' + fx(o.chartPart, 1) + ' · 기업체력 ' + f.total + ' × 0.4 = ' + fx(o.fundPart, 1) +
-              (o.rs == null ? '' : ' · RS 보정 ' + (o.rsAdj > 0 ? "+" : "") + o.rsAdj) + ' → <b>총 ' + t + '점</b>') + '</div>' +
+            ? '수급 ' + sup.total + ' × 0.5 + 세력선 ' + ln.total + ' × 0.5 → <b>총 ' + t + '점</b>'
+            : '수급 ' + sup.total + ' × 0.4 = ' + fx(o.supplyPart, 1) + ' · 세력선 ' + ln.total + ' × 0.4 = ' + fx(o.linePart, 1) +
+              ' · 기업체력 ' + f.total + ' × 0.2 = ' + fx(o.fundPart, 1) + ' → <b>총 ' + t + '점</b>') + '</div>' +
         '</div>' +
       '</div>' +
+      '<div class="tsum" style="margin-top:9px">밥그릇: <b>' + esc(ln.bowl.name) + '</b> — ' + esc(ln.bowl.note) + '</div>' +
+      '<div class="tsum">수급(수박 참고용): ' + esc(supplyNote(r, sup)) + ' → <b>' + sup.total + '점</b></div>' +
       '<div class="cmpv ' + cv.cls + '" style="margin:12px 0 0">' + cv.text + '</div>' +
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>세력선(차트) 매력도</h3>' +
-      '<p class="hint">수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10</p>' +
+      '<p class="hint">수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10, 여기에 정배열·밥그릇 자리 보정</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
-        '<div class="big-gauge ' + gaugeClass(m.total) + '" style="--p:' + m.total + '"><span><b>' + m.total + '</b><small>세력선 점수</small></span></div>' +
+        '<div class="big-gauge ' + gaugeClass(ln.total) + '" style="--p:' + ln.total + '"><span><b>' + ln.total + '</b><small>세력선 점수</small></span></div>' +
         '<div style="flex:1">' +
-          '<div class="brk"><span>세 선 수렴</span><i style="--w:' + barW(m.convScore, 45) + '"></i><b>' + m.convScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>224선 자리</span><i style="--w:' + barW(m.posScore, 25) + '"></i><b>' + m.posScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>매집봉</span><i style="--w:' + barW(m.accScore, 20) + '"></i><b>' + m.accScore.toFixed(0) + '</b></div>' +
-          '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(m.divScore, 10) + '"></i><b>' + m.divScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>세 선 수렴</span><i style="--w:' + barW(ln.convScore, 45) + '"></i><b>' + ln.convScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>224선 자리</span><i style="--w:' + barW(ln.posScore, 25) + '"></i><b>' + ln.posScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>매집봉</span><i style="--w:' + barW(ln.accScore, 20) + '"></i><b>' + ln.accScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(ln.divScore, 10) + '"></i><b>' + ln.divScore.toFixed(0) + '</b></div>' +
+          '<div class="brk"><span>정배열 보정</span><i style="--w:' + barW(Math.max(0, ln.trendAdj), 6) + '"></i><b>' + (ln.trendAdj > 0 ? "+" : "") + ln.trendAdj + '</b></div>' +
+          '<div class="brk"><span>밥그릇 ' + esc(ln.bowl.seat || "—") + '번</span><i style="--w:' + barW(Math.max(0, ln.bowl.adj), 12) + '"></i><b>' + (ln.bowl.adj > 0 ? "+" : "") + ln.bowl.adj + '</b></div>' +
         '</div>' +
       '</div>' +
+      '<div class="note">' + esc(ln.bowl.note) + '</div>' +
     '</div>' +
     '<div class="card chartcard" id="chartCard" style="margin:12px 0">' + chartCardHTML(r) + '</div>' +
     '<div class="card" style="margin:12px 0">' +
@@ -2386,12 +2571,13 @@ function openDetail(key) {
       '<div class="kv" style="margin-top:12px">' +
         '<div><span>현재가</span><b>' + won(r.price) + '원</b></div>' +
         '<div><span>224선 대비</span><b class="' + (dev != null && dev >= 0 ? "up" : "down") + '">' + pct(dev) + '</b></div>' +
-        '<div><span>세 선 수렴도</span><b>' + pctAbs(m.conv, 2) + '</b></div>' +
-        '<div><span>추세 판정</span><b>' + esc(m.trend) + '</b></div>' +
+        '<div><span>세 선 수렴도</span><b>' + pctAbs(ln.conv, 2) + '</b></div>' +
+        '<div><span>추세 판정</span><b>' + esc(ln.trend) + '</b></div>' +
+        '<div><span>밥그릇 자툐</span><b>' + esc(ln.bowl.name) + '</b></div>' +
       '</div>' +
     '</div>' +
     rsCardHTML(r) +
-    fundCardHTML(r, m) +
+    fundCardHTML(r, ln) +
     safeCardHTML(r, f) +
     signalCardHTML(r) +
     pyrCardHTML(r) +
@@ -2419,8 +2605,8 @@ function openDetail(key) {
     '<div class="card" style="margin:12px 0">' +
       '<h3>매집봉 · 배당</h3>' +
       '<div class="kv">' +
-        '<div><span>최근 30거래일 매집봉</span><b>' + m.bars + '회</b></div>' +
-        '<div><span>최대 매집 배수</span><b>' + (m.mult ? m.mult.toFixed(2) + '배' : "—") + '</b></div>' +
+        '<div><span>최근 30거래일 매집봉</span><b>' + ln.bars + '회</b></div>' +
+        '<div><span>최대 매집 배수</span><b>' + (ln.mult ? ln.mult.toFixed(2) + '배' : "—") + '</b></div>' +
         '<div><span>배당률</span><b>' + (r.div == null ? "—" : pctAbs(r.div, 2)) + '</b></div>' +
         '<div><span>연속배당</span><b>' + esc(r.years || "—") + '</b></div>' +
         '<div><span>시트 점수·등급</span><b>' + (r.score == null ? "—" : r.score + "점") + ' · ' + esc(r.grade || "—") + '</b></div>' +
@@ -2433,7 +2619,7 @@ function openDetail(key) {
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 + RS 보정(±10), 100점 만점. 세력선 = 수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 차트는 타이밍, 재무는 회사의 튼튼함, RS는 시장 대비 세력이야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 뚤림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴도 45 + 224선 자리 25 + 매집봉 20 + 배당 보너스 10 + 정배열·밥그릇 자리 보정. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 차트는 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -2765,9 +2951,11 @@ function renderSetup() {
     '데이터: <a href="' + SHEET_URL + '" target="_blank" rel="noopener" style="color:var(--teal)">단테-세력선-추천</a> 구글 시트 (기준일 ' + esc(base || "—") + '). ' +
     '매매일지·설정은 이 브라우저(localStorage)에만 저장돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
+    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 뚤림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 45 + 224선 자리 25 + 매집봉 20 + 배당 10 + 정배열 보정 + 밥그릇 자리(3번 +12~4 · 4번 −15 · 1번 −12).<br>' +
+    '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·뉼림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게.<br>' +
-    '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10. 총 매력도 = 세력선 × 0.6 + 기업체력 × 0.4 + RS 보정(±10). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
-    '재무 안정성 체크리스트(김종봉 3원칙)는 시트 <b>추천종목</b> 탭 AE·AF열(유보율·최대주주지분)을 읽어 부채비율 100% 이하·유보율 300% 이상·최대주주 30% 이상을 ✅/⚠️로 보여줘. 점수에는 넣지 않아.<br>' +
+    '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
+    '재무 안정성 체크리스트(김종봉 3원칙)는 시트 <b>추천종목</b> 탭 AE·AF열(유보율·최대주주지분)을 읽어 부채비율 100% 이하·유보율 300% 이상·최대주주 30% 이상을 ✅/⚠️로 보여줘. 유보율·최대주주는 기업체력 20% 안에서 보정(각 +5, 최대 ±10)으로도 들어가.<br>' +
     '눌림 거래량·위험 경고(김정수)는 AG·AH열(눌림거래량비율·위험경고). 눌림 33% 이하면 🟢 세력 미이탈, 경고는 최근 120거래일 저가 대비 +100%·고거래량 장대음봉·긴 윗꼬리 음봉으로 판정해. 매매일지에는 최근 3개월(90일) 승률 카드와 복기 태그·한 줄 복기가 있어.<br>' +
     '업종·52주신저가·증거금은 <b>추천종목</b> 탭 AI~AL열. 업종이 같은 종목이 2개 이상이면 추천·보유 목록 위에 <b>같은 업종 중복 주의</b> 배너를 띄워. 52주 최저가 대비 3% 이내거나 이탈하면 ⚠️ 신저가 주의, 증거금이 100%면 ⚠️ 증거금100% 배지가 붙어(증거금률은 증권사별 값이라 확인되는 `신용가능`·`증거금100%`만 적어).<br>' +
     '피라미드 물타기(1:1:2:4)는 1차 금액을 넣으면 8배까지 나눠 계산해. 단테식으로 2차부터 직전 단계 -15% 자리를 잡고, 체크박스 두 개(① -15~-20% 이상 하락 ② 종가 첫 양봉)가 모두 켜져야 조건 충족이야. 목표가는 1차 +20.3/30.3% → 2차 완료 +10.3/20.3%로 절반이 돼.<br>' +
