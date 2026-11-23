@@ -2922,7 +2922,7 @@ function renderJournal() {
         '<span class="jtype ' + (e.type === "buy" ? "buy" : "sell") + '">' + (e.type === "buy" ? "매수" : "매도") + '</span>' +
         '<div class="jmain"><b>' + esc(e.name) + '</b>' +
           '<div class="meta">' + esc(e.date) + (e.round ? ' · ' + esc(e.round) : '') + ' · ' + won(e.price) + '원 × ' + won(e.qty) + '주 = ' + won(amt) + '원' +
-            (e.stop ? ' · 손절 ' + won(e.stop) : ' · <span style="color:var(--amber)">손절선 없음</span>') +
+            (e.stop ? ' · 손절 ' + won(e.stop) + '원' : ' · <span style="color:var(--amber)">손절선 없음</span>') +
             (e.src === "sheet" ? ' · <span style="color:var(--teal)">시트</span>' : '') + '</div>' +
           (e.note ? '<div class="jnote">' + esc(e.note) + '</div>' : '') +
           ((e.tags || []).length ? '<div>' + e.tags.map(t => '<span class="jtag ' + (t === TAG_GOOD ? "good" : "bad") + '">' + esc(t) + '</span>').join("") + '</div>' : '') +
@@ -3266,7 +3266,7 @@ $("#jForm").addEventListener("submit", (e) => {
     toast("기록을 고쳤어");
   } else {
     state.journal.push(entry);
-    toast("매매 기록 저장 완료");
+    toast(state.edit.sheetKey ? "시트 기록을 앱 기록으로 남겨 고쳤어" : "매매 기록 저장 완료");
   }
   persistJournal();
   mergeJournal();
