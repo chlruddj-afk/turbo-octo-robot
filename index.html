@@ -180,6 +180,7 @@ select.sort{background:var(--card);border:1px solid var(--line);color:var(--mute
 .brk i{flex:1;height:5px;border-radius:3px;background:#1b2740;position:relative;overflow:hidden}
 .brk i::after{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--w);background:linear-gradient(90deg,var(--teal),var(--blue));border-radius:3px}
 .brk b{flex:0 0 26px;text-align:right;color:var(--text);font-size:11px}
+.brk i.neg::after{background:linear-gradient(90deg,#7a2b34,#f4626a)}
 .maplab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:6px}
 .maplab b{display:block;color:var(--text);font-size:12px;font-weight:700;margin-top:1px}
 
@@ -729,7 +730,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.9.0";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const JOURNAL_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("매매일지") + "&tqx=out:csv";
 const LS = {
@@ -1324,6 +1325,79 @@ function bowlCalc(r) {
            note: "224선 위 " + fx(dev, 1) + "%" + crossTxt + lowTxt + " — 3번 타점에서 조금 지난 자리라 눌림을 기다려." };
 }
 
+/* ══════════ v1.9.0 볼린저밴드(20,2) 수축·지지 / 반년 신고가 후 224선 눌림 / 224선 이격 과열 ══════════
+   모두 차트데이터 120거래일 종가·고가·저가로 직접 계산한다(시트 열은 건드리지 않음). */
+const bandCache = new Map();
+function bandOf(r) {
+  const key = [r.code, r.price, r.ma224, chartState.fetchedAt || 0].join("|");
+  const hit = bandCache.get(key);
+  if (hit) return hit;
+  const v = bandCalc(r);
+  bandCache.set(key, v);
+  return v;
+}
+function bandCalc(r) {
+  const bars = barsFor(r);
+  const none = { ok: false, price: null, dev: null, bw: null, bwPct: null, mid: null, up: null, lo: null,
+                 squeeze: false, sqAdj: 0, highAdj: 0, heat: 0, boost: 0, drop: null, hiDate: null, note: "" };
+  if (!bars || bars.length < 40) return none;
+  const n = bars.length;
+  const last = bars[n - 1];
+  const price = r.price || last.c;
+  const ma224 = r.ma224 || last.m224 || null;
+  if (!price) return none;
+  const dev = ma224 ? (price - ma224) / ma224 * 100 : null;
+
+  /* 20일 볼린저밴드 — 중심선 MA20 ± 2σ, 밴드폭 = (상단-하단)/중심선 × 100 */
+  const bws = [];
+  let cur = null;
+  for (let i = 19; i < n; i++) {
+    let s = 0;
+    for (let k = i - 19; k <= i; k++) s += bars[k].c;
+    const mid = s / 20;
+    let q = 0;
+    for (let k = i - 19; k <= i; k++) { const d = bars[k].c - mid; q += d * d; }
+    const sd = Math.sqrt(q / 20);
+    cur = { d: bars[i].d, mid: mid, up: mid + 2 * sd, lo: mid - 2 * sd, bw: mid > 0 ? 4 * sd / mid * 100 : 0 };
+    bws.push(cur);
+  }
+  if (!cur || !bws.length) return none;
+  const rec = bws.slice(-5);
+  const bw = rec.reduce((a, b) => a + b.bw, 0) / rec.length;
+  const bwPct = bws.filter(b => b.bw <= bw).length / bws.length * 100;
+
+  /* ① 수축(스퀴즈) + 224선 부근에서 20일선·하단선 지지 */
+  const lowNow = last.l == null ? price : last.l;
+  const near224 = dev != null && dev >= -3 && dev <= 8;
+  const midTouch = lowNow <= cur.mid * 1.005 && price >= cur.mid * 0.995;
+  const loTouch = lowNow <= cur.lo * 1.01 && price >= cur.lo * 0.99;
+  const squeeze = bwPct <= 30 && near224 && (midTouch || loTouch);
+  const sqAdj = squeeze ? 5 : 0;
+
+  /* ② 120거래일 신고가 뒤 -8~-25% 눌림 + 224선 ±5% 안착 */
+  let hi = -Infinity, hiIdx = -1;
+  for (let i = 0; i < n; i++) {
+    const h = bars[i].h == null ? bars[i].c : bars[i].h;
+    if (h > hi) { hi = h; hiIdx = i; }
+  }
+  const drop = hi > 0 ? (hi - price) / hi * 100 : null;
+  const hiAgo = n - 1 - hiIdx;
+  const highOk = drop != null && drop >= 8 && drop <= 25 && dev != null && Math.abs(dev) <= 5 && hiAgo >= 2;
+  const highAdj = highOk ? 4 : 0;
+
+  /* ③ 224선 이격 과열 · 추격 구간 감점 */
+  const heat = dev == null ? 0 : dev >= 35 ? -12 : dev >= 25 ? -10 : dev >= 18 ? -8 : 0;
+
+  const bits = [];
+  if (squeeze) bits.push("볼린저 수축(밴드폭 하위 " + Math.round(bwPct) + "%) + " + (loTouch ? "하단선" : "20일선") + " 지지 → +" + sqAdj);
+  if (highOk) bits.push("반년 신고가(" + String(bars[hiIdx].d).slice(5) + ") 대비 -" + fx(drop, 1) + "% 눌림, 224선 " + (dev >= 0 ? "+" : "-") + fx(Math.abs(dev), 1) + "% 부근 → +" + highAdj);
+  if (heat) bits.push("224선 이격 +" + fx(dev, 1) + "% 과열(추격 주의) → " + heat);
+
+  return { ok: true, price: price, dev: dev, bw: bw, bwPct: bwPct, mid: cur.mid, up: cur.up, lo: cur.lo,
+           squeeze: squeeze, sqAdj: sqAdj, highAdj: highAdj, heat: heat, boost: sqAdj + highAdj,
+           drop: drop, hiDate: hiIdx >= 0 ? bars[hiIdx].d : null, note: bits.join(" · ") };
+}
+
 /* ── 수급 40% (0~100) ──
    RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고 */
 function supplyOf(r) {
@@ -1404,8 +1478,10 @@ function lineOf(r) {
   const accPart = clamp(m.accScore / 20 * 15, 0, 15);
   const divPart = clamp(m.divScore / 10 * 5, 0, 5);
   const base = convPart + posPart + trendPart + accPart + divPart;
-  const total = Math.round(clamp(base + bowl.adj, 0, 100));
-  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, total };
+  const bb = bandOf(r);
+  const bbAdj = bb.boost + bb.heat;
+  const total = Math.round(clamp(base + bowl.adj + bbAdj, 0, 100));
+  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, total };
 }
 
 /* ── 기업체력 20% (0~100): 기존 재무 점수 + 유보율·최대주주 안정성 ── */
@@ -1507,10 +1583,11 @@ function currentBase() {
 /* ══════════ 일봉 차트 (차트데이터 탭) ══════════ */
 const CHART_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("차트데이터") + "&tqx=out:csv";
 const CHART_MA = { ma112: { c: "#f0b429", t: "112선" }, ma224: { c: "#31d0aa", t: "224선" }, ma448: { c: "#9b7bff", t: "448선" } };
+const CHART_BB_COLOR = "#7c9dff";
 const chartState = {
   byCode: {}, status: "idle", fetchedAt: null, error: null,
   code: null, row: null, data: null, guide: {},
-  days: 120, on: { ma112: true, ma224: true, ma448: true, guide: true },
+  days: 120, on: { ma112: true, ma224: true, ma448: true, bb: false, guide: true },
   hover: null, geom: null
 };
 const chartCode = (code) => String(code == null ? "" : code).replace(/[^0-9]/g, "").padStart(6, "0");
@@ -1575,6 +1652,7 @@ async function syncChart() {
   /* 차트가 새로 들어오면 밥그릇 자리·수급 점수가 정밀해지므로 점수 화면을 다시 그린다 */
   if (chartState.status === "live") {
     bowlCache.clear();
+    bandCache.clear();
     renderHero();
     renderReco();
     const sheet = document.getElementById("detail");
@@ -1604,9 +1682,12 @@ function marketStatusText() {
   return "불러오는 중";
 }
 
+function chartChipColor(k) {
+  return k === "guide" ? "#e9eefb" : k === "bb" ? CHART_BB_COLOR : (CHART_MA[k] ? CHART_MA[k].c : "#e9eefb");
+}
 function chartChip(k, label) {
   const on = !!chartState.on[k];
-  const col = k === "guide" ? "#e9eefb" : CHART_MA[k].c;
+  const col = chartChipColor(k);
   return '<button type="button" class="' + (on ? "on" : "") + '" data-act="chartToggle" data-k="' + k + '"' +
     (on ? ' style="color:' + col + '"' : '') + '><i></i>' + label + '</button>';
 }
@@ -1620,7 +1701,7 @@ function chartCardHTML(r) {
     : "";
   const chips = has
     ? '<div class="chart-chips">' + chartChip("ma112", "112선") + chartChip("ma224", "224선") + chartChip("ma448", "448선") +
-      chartChip("guide", "매수·손절선") + '</div>'
+      chartChip("bb", "볼린저(20,2)") + chartChip("guide", "매수·손절선") + '</div>'
     : "";
   let body;
   if (!has) {
@@ -1635,6 +1716,7 @@ function chartCardHTML(r) {
         '<span><i style="background:#f4626a"></i>양봉</span>' +
         '<span><i style="background:#5b9cff"></i>음봉</span>' +
         '<span><i style="background:#f0b429"></i>매집봉(20일 평균 2배↑)</span>' +
+        (chartState.on.bb ? '<span><i style="background:' + CHART_BB_COLOR + '"></i>볼린저(20,2)</span>' : '') +
       '</div>';
   }
   const win = has ? bars.slice(Math.max(0, bars.length - chartState.days)) : [];
@@ -1704,6 +1786,7 @@ function showChartTip(i, x) {
     (b.m112 != null ? line("112선", won(b.m112), CHART_MA.ma112.c) : '') +
     (b.m224 != null ? line("224선", won(b.m224), CHART_MA.ma224.c) : '') +
     (b.m448 != null ? line("448선", won(b.m448), CHART_MA.ma448.c) : '') +
+    (chartState.on.bb && g.bb && g.bb[i] ? line("볼린저 상·하", won(g.bb[i].up) + ' / ' + won(g.bb[i].lo), CHART_BB_COLOR) : '') +
     '<div class="tr"><span>거래량</span><b>' + won(b.v) +
       (mult ? ' <em style="color:' + (mult >= 2 ? '#f0b429' : 'var(--dim)') + ';font-style:normal">' + mult.toFixed(1) + '배</em>' : '') +
     '</b></div>';
@@ -1738,6 +1821,21 @@ function drawChart() {
   });
   const on = chartState.on;
   const guide = chartState.guide || {};
+  /* 볼린저밴드(20,2) — 켰을 때만 최근 종가로 계산 */
+  let bbAll = null;
+  if (on.bb) {
+    bbAll = all.map((b, i) => {
+      if (i < 19) return null;
+      let s = 0;
+      for (let k = i - 19; k <= i; k++) s += all[k].c;
+      const mid = s / 20;
+      let q = 0;
+      for (let k = i - 19; k <= i; k++) { const d = all[k].c - mid; q += d * d; }
+      const sd = Math.sqrt(q / 20);
+      return { mid: mid, up: mid + 2 * sd, lo: mid - 2 * sd };
+    });
+  }
+  const bbView = bbAll ? bbAll.slice(start) : null;
   const padL = 4, padR = 68, padT = 12, padB = 18;
   const volH = Math.max(34, Math.round(cssH * 0.19));
   const volGap = 9;
@@ -1746,11 +1844,12 @@ function drawChart() {
   const step = plotW / n;
 
   const vals = [];
-  view.forEach(b => {
+  view.forEach((b, i) => {
     vals.push(b.h, b.l);
     if (on.ma112 && b.m112 != null) vals.push(b.m112);
     if (on.ma224 && b.m224 != null) vals.push(b.m224);
     if (on.ma448 && b.m448 != null) vals.push(b.m448);
+    if (bbView && bbView[i]) vals.push(bbView[i].up, bbView[i].lo);
   });
   if (on.guide) [guide.buy1, guide.buy2, guide.stop, guide.price].forEach(v => { if (v) vals.push(v); });
   let hi = Math.max.apply(null, vals), lo = Math.min.apply(null, vals);
@@ -1808,6 +1907,27 @@ function drawChart() {
     if (bw <= 2) { ctx.fillRect(Math.round(x), top, 1, hgt); }
     else { ctx.fillRect(x - bw / 2, top, bw, hgt); }
   });
+
+  /* 볼린저밴드(20,2) — 얇은 세 줄 */
+  if (on.bb && bbView) {
+    const drawBB = (key, color, width, dash) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      let started = false;
+      bbView.forEach((bv, i) => {
+        if (!bv) { started = false; return; }
+        const x = xOf(i), y = yOf(bv[key]);
+        if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+      });
+      ctx.stroke();
+      if (dash) ctx.setLineDash([]);
+    };
+    drawBB("up", "rgba(124,157,255,.78)", 1);
+    drawBB("lo", "rgba(124,157,255,.78)", 1);
+    drawBB("mid", "rgba(124,157,255,.45)", 1, [3, 3]);
+  }
 
   /* 세력선 */
   const drawMA = (key, flag, color, width) => {
@@ -1905,7 +2025,7 @@ function drawChart() {
     ctx.fillText(dtxt, centerOk ? x : (x <= padL + room ? padL : padL + plotW), cssH - 2);
   }
 
-  chartState.geom = { n: n, view: view, vma: vma, step: step, padL: padL, padT: padT, priceH: priceH, plotW: plotW, w: cssW, h: cssH };
+  chartState.geom = { n: n, view: view, vma: vma, bb: bbView, step: step, padL: padL, padT: padT, priceH: priceH, plotW: plotW, w: cssW, h: cssH };
 }
 let chartResizeTimer = null;
 window.addEventListener("resize", () => {
@@ -2653,7 +2773,7 @@ function openDetail(key) {
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>세력선(차트) 매력도</h3>' +
-      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리로 100점</p>' +
+      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정으로 100점</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
         '<div class="big-gauge ' + gaugeClass(ln.total) + '" style="--p:' + ln.total + '"><span><b>' + ln.total + '</b><small>세력선 점수</small></span></div>' +
         '<div style="flex:1">' +
@@ -2663,9 +2783,12 @@ function openDetail(key) {
           '<div class="brk"><span>매집봉</span><i style="--w:' + barW(ln.accPart, 15) + '"></i><b>' + ln.accPart.toFixed(0) + '</b></div>' +
           '<div class="brk"><span>배당 보너스</span><i style="--w:' + barW(ln.divPart, 5) + '"></i><b>' + ln.divPart.toFixed(0) + '</b></div>' +
           '<div class="brk"><span>밥그릇 ' + esc(ln.bowl.seat || "—") + '번</span><i style="--w:' + barW(Math.max(0, ln.bowl.adj), 10) + '"></i><b>' + (ln.bowl.adj > 0 ? "+" : "") + ln.bowl.adj + '</b></div>' +
+          (ln.bb.boost ? '<div class="brk"><span>볼린저·눌림</span><i style="--w:' + barW(ln.bb.boost, 9) + '"></i><b>+' + ln.bb.boost + '</b></div>' : '') +
+          (ln.bb.heat ? '<div class="brk"><span>이격 과열</span><i class="neg" style="--w:' + barW(Math.abs(ln.bb.heat), 12) + '"></i><b>' + ln.bb.heat + '</b></div>' : '') +
         '</div>' +
       '</div>' +
       '<div class="note">' + esc(ln.bowl.note) + '</div>' +
+      (ln.bb.note ? '<div class="tsum" style="color:var(--muted)">' + esc(ln.bb.note) + '</div>' : '') +
     '</div>' +
     '<div class="card chartcard" id="chartCard" style="margin:12px 0">' + chartCardHTML(r) + '</div>' +
     '<div class="card" style="margin:12px 0">' +
@@ -2723,7 +2846,7 @@ function openDetail(key) {
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10). 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -3065,9 +3188,9 @@ function renderSetup() {
     '데이터: <a href="' + SHEET_URL + '" target="_blank" rel="noopener" style="color:var(--teal)">단테-세력선-추천</a> 구글 시트 (기준일 ' + esc(base || "—") + '). ' +
     '매매일지는 구글 시트 <b>매매일지</b> 탭을 함께 읽고(열 이름: 일자·구분·종목명·종목코드·단가·수량·금액·손절가·차수·근거 메모·복기 태그·한 줄 복기), 앱에서 직접 남긴 기록·설정은 이 브라우저(localStorage)에 저장돼. 같은 체결은 기기 기록을 우선하고, 시트에서 더한 행은 새로고침 때마다 바로 반영돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
-    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12).<br>' +
+    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12) + <b>v1.9.0 볼린저·이격 보정</b>(볼린저 20일 밴드폭이 120일 하위 30%로 수축한 채 224선 위에서 20일선·하단선 지지 +5 · 120거래일 신고가 대비 -8~-25% 눌림해 224선 ±5% 안착 +4 · 224선 이격 +18% 이상 과열 −8~−12).<br>' +
     '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·눌림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
-    '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게.<br>' +
+    '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게. 차트의 <b>볼린저(20,2)</b> 토글을 켜면 상·하단(2σ)과 중심선(MA20)이 얇게 그려져.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
     '재무 안정성 체크리스트(김종봉 3원칙)는 시트 <b>추천종목</b> 탭 AE·AF열(유보율·최대주주지분)을 읽어 부채비율 100% 이하·유보율 300% 이상·최대주주 30% 이상을 ✅/⚠️로 보여줘. 유보율·최대주주는 기업체력 20% 안에서 보정(각 +5, 최대 ±10)으로도 들어가.<br>' +
     '눌림 거래량·위험 경고(김정수)는 AG·AH열(눌림거래량비율·위험경고). 눌림 33% 이하면 🟢 세력 미이탈, 경고는 최근 120거래일 저가 대비 +100%·고거래량 장대음봉·긴 윗꼬리 음봉으로 판정해. 매매일지에는 최근 3개월(90일) 승률 카드와 복기 태그·한 줄 복기가 있어.<br>' +
@@ -3146,7 +3269,7 @@ document.addEventListener("click", (ev) => {
     chartState.on[k] = !chartState.on[k];
     store.set(LS.chartUi, { days: chartState.days, on: chartState.on });
     el.classList.toggle("on", !!chartState.on[k]);
-    el.style.color = chartState.on[k] ? (k === "guide" ? "#e9eefb" : CHART_MA[k].c) : "";
+    el.style.color = chartState.on[k] ? chartChipColor(k) : "";
     chartState.hover = null;
     const tip = document.getElementById("chartTip"); if (tip) tip.classList.add("hidden");
     drawChart();
