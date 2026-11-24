@@ -1480,7 +1480,7 @@ function angleCalc(r) {
   if (hiI < 5) return none;
 
   /* 그 앞의 스윙 저점 — 고점 최소 5봉 전까지, 최대 45봉 */
-  const a0 = Math.max(0, hiI - 45), a1 = hiI - 4;
+  const a0 = Math.max(0, hiI - 45), a1 = hiI - 5;
   if (a1 <= a0) return none;
   let loI = a0;
   for (let i = a0; i <= a1; i++) if (loOf(bars[i]) < loOf(bars[loI])) loI = i;
@@ -1491,7 +1491,7 @@ function angleCalc(r) {
   /* 고점 뒤 조정 — 저점이 확정된(오늘 봉이 아닌) 자리만 */
   if (hiI >= n - 3) return none;
   let recI = hiI + 1;
-  for (let i = hiI + 1; i < n - 1; i++) if (loOf(bars[i]) < loOf(bars[recI])) recI = i;
+  for (let i = hiI + 1; i < n; i++) if (loOf(bars[i]) < loOf(bars[recI])) recI = i;
   if (recI >= n - 1) return none;
 
   const fallPct = (bars[hiI].c - loOf(bars[recI])) / bars[hiI].c * 100;
