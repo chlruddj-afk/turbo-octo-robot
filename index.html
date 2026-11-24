@@ -730,7 +730,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.10.0";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const JOURNAL_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("매매일지") + "&tqx=out:csv";
 const LS = {
@@ -1118,9 +1118,12 @@ function sigHTML(r) {
   const p = pullBadge(r.pullVol);
   const cls = (c) => c === "teal" ? "ok" : c === "amber" ? "mid" : c === "red" ? "bad" : "off";
   let out = '<span class="sig ' + cls(p.c) + '">' + p.ico + ' ' + esc(p.t) + (r.pullVol == null ? "" : ' ' + fx(r.pullVol, 1) + '%') + '</span>';
-  const w = warnList(r);
-  if (!w.length) out += '<span class="sig ok">✅ 경고 없음</span>';
-  else out += '<span class="sig ' + (w.some(x => /장대음봉|2배/.test(x)) ? "bad" : "mid") + '">⚠️ ' + esc(w.join(" · ")) + '</span>';
+  const all = warnList(r);
+  const ds = all.filter(x => /3년\s*대시세/.test(x));
+  const w = all.filter(x => !/3년\s*대시세/.test(x));
+  if (ds.length) out += '<span class="sig mid">📈 3년 대시세 주의</span>';
+  if (w.length) out += '<span class="sig ' + (w.some(x => /장대음봉|2배/.test(x)) ? "bad" : "mid") + '">⚠️ ' + esc(w.join(" · ")) + '</span>';
+  else if (!ds.length) out += '<span class="sig ok">✅ 경고 없음</span>';
   return out;
 }
 /* ── v1.6.0 업종·52주신저가·증거금 판정 ── */
@@ -1398,6 +1401,123 @@ function bandCalc(r) {
            drop: drop, hiDate: hiIdx >= 0 ? bars[hiIdx].d : null, note: bits.join(" · ") };
 }
 
+/* ══════════ v1.10.0 224선 숙성(80거래일) / 각도술 완만 눌림 / 3년 대시세 주의 ══════════
+   · 224선 숙성: 최근 돌파나 224선 ±10% 자리에 오기 전, 종가가 224선(MA224) 아래에서
+     80거래일(약 4개월) 이상 연속으로 머문 이력이 있으면 세력선 +3점.
+   · 각도술 완만 눌림: 직전 스윙 상승(저점→고점) 뒤 조정이 ① 하락 기간 ≥ 상승 기간 ② 하루 하락률이
+     하루 상승률의 절반 이하 ③ 되돌림 폭이 상승 폭의 40% 이하(3일 이상) 중 하나로 완만하고,
+     눌림 저점이 직전 스윙 저점보다 높은 우상향 눌림목이면 +3점.
+   · 3년 대시세 주의: 시트 AH열 `위험경고` 문구로 들어오며, 점수는 깎지 않고 배지·코멘트로만 표시한다. */
+const matureCache = new Map();
+function matureOf(r) {
+  const key = [r.code, r.price, r.ma224, chartState.fetchedAt || 0].join("|");
+  const hit = matureCache.get(key);
+  if (hit) return hit;
+  const v = matureCalc(r);
+  matureCache.set(key, v);
+  return v;
+}
+function matureCalc(r) {
+  const none = { ok: false, days: 0, dev: null, adj: 0, start: null, end: null, gap: null, note: "" };
+  const bars = barsFor(r);
+  if (!bars || bars.length < 80) return none;
+  const n = bars.length, last = bars[n - 1];
+  const price = r.price || (last && last.c);
+  const ma224 = r.ma224 || (last && last.m224) || null;
+  if (!price || !ma224) return none;
+  const dev = (price - ma224) / ma224 * 100;
+
+  /* 종가가 224선 아래(같은 값 포함)에 연속으로 머문 가장 긴 구간 — 오늘 봉은 제외 */
+  let best = 0, cur = 0, endI = -1;
+  for (let i = 0; i < n - 1; i++) {
+    const m = bars[i].m224;
+    if (m != null && bars[i].c <= m) {
+      cur++;
+      if (cur > best) { best = cur; endI = i; }
+    } else cur = 0;
+  }
+  const gap = endI >= 0 ? (n - 1 - endI) : null;
+  if (dev < -10 || best < 80) return { ...none, days: best, dev: dev, gap: gap };
+
+  const startI = endI - best + 1;
+  const startD = bars[startI] ? String(bars[startI].d).slice(5) : "";
+  const endD = bars[endI] ? String(bars[endI].d).slice(5) : "";
+  const months = best / 20;
+  const note = dev >= 0
+    ? "종가가 224선 아래에서 " + best + "거래일(약 " + fx(months, 1) + "개월, " + startD + "~" + endD + ")을 머문 바닥을 딛고 " +
+      (gap == null ? "" : gap + "거래일 전 ") + "224선 위로 올라왔어. 4개월 넘게 숙성한 자리에서 나온 돌파라 신뢰도가 높아."
+    : "종가가 224선 아래에서 " + best + "거래일(약 " + fx(months, 1) + "개월, " + startD + "~" + endD + ")을 머물렀고, 지금은 224선 " +
+      fx(dev, 1) + "% 부근에서 돌파를 시험 중이야. 숙성 이력은 이미 쌓였으니 224선 위로 종가가 붙는지가 관건이야.";
+  return { ok: true, days: best, dev: dev, adj: 3, start: startD, end: endD, gap: gap, note: note };
+}
+
+const angleCache = new Map();
+function angleOf(r) {
+  const key = [r.code, r.price, r.ma224, chartState.fetchedAt || 0].join("|");
+  const hit = angleCache.get(key);
+  if (hit) return hit;
+  const v = angleCalc(r);
+  angleCache.set(key, v);
+  return v;
+}
+function angleCalc(r) {
+  const none = { ok: false, adj: 0, risePct: null, riseDays: null, fallPct: null, fallDays: null, rpd: null, fpd: null, note: "" };
+  const bars = barsFor(r);
+  if (!bars || bars.length < 60) return none;
+  const n = bars.length, last = bars[n - 1];
+  const price = r.price || (last && last.c);
+  const ma224 = r.ma224 || (last && last.m224) || null;
+  const dev = (price && ma224) ? (price - ma224) / ma224 * 100 : null;
+  if (dev == null || dev < -5) return none;
+  const loOf = (b) => (b.l == null ? b.c : b.l);
+  const hiOf = (b) => (b.h == null ? b.c : b.h);
+  const dTxt = (i) => String(bars[i].d).slice(5);
+
+  /* 직전 스윙 고점 — 최근 45봉 안의 최고가 */
+  const w0 = Math.max(0, n - 45);
+  let hiI = w0;
+  for (let i = w0; i < n; i++) if (hiOf(bars[i]) > hiOf(bars[hiI])) hiI = i;
+  if (hiI < 5) return none;
+
+  /* 그 앞의 스윙 저점 — 고점 최소 5봉 전까지, 최대 45봉 */
+  const a0 = Math.max(0, hiI - 45), a1 = hiI - 4;
+  if (a1 <= a0) return none;
+  let loI = a0;
+  for (let i = a0; i <= a1; i++) if (loOf(bars[i]) < loOf(bars[loI])) loI = i;
+  const risePct = (bars[hiI].c - bars[loI].c) / bars[loI].c * 100;
+  const riseDays = hiI - loI;
+  if (!(risePct >= 8 && riseDays >= 5)) return none;
+
+  /* 고점 뒤 조정 — 저점이 확정된(오늘 봉이 아닌) 자리만 */
+  if (hiI >= n - 3) return none;
+  let recI = hiI + 1;
+  for (let i = hiI + 1; i < n - 1; i++) if (loOf(bars[i]) < loOf(bars[recI])) recI = i;
+  if (recI >= n - 1) return none;
+
+  const fallPct = (bars[hiI].c - loOf(bars[recI])) / bars[hiI].c * 100;
+  const fallDays = n - 1 - hiI;
+  const rpd = risePct / riseDays, fpd = fallPct / Math.max(fallDays, 1);
+  const gentle = fallDays >= riseDays || fpd <= rpd * 0.5 || (fallPct <= risePct * 0.4 && fallDays >= 3);
+  const higher = loOf(bars[recI]) > loOf(bars[loI]);
+  const ok = !!(gentle && higher && fallPct >= 3 && price >= loOf(bars[recI]) * 1.005);
+  if (!ok) return { ...none, risePct: risePct, riseDays: riseDays, fallPct: fallPct, fallDays: fallDays, rpd: rpd, fpd: fpd };
+
+  const how = fallDays >= riseDays
+    ? "눌림 기간(" + fallDays + "일)이 상승 기간(" + riseDays + "일)보다 길어"
+    : fpd <= rpd * 0.5
+      ? "하루 하락 " + fx(fpd, 2) + "%p가 하루 상승 " + fx(rpd, 2) + "%p의 절반 이하라"
+      : "되돌림이 상승 폭의 " + fx(fallPct / risePct * 100, 0) + "%뿐이라";
+  const note = "저점 " + dTxt(loI) + " → 고점 " + dTxt(hiI) + " +" + fx(risePct, 1) + "%(" + riseDays + "일) 상승 뒤 " +
+    "-" + fx(fallPct, 1) + "% 눌림(" + fallDays + "일). " + how + " 각도가 완만하고, 눌림 저점(" + won(loOf(bars[recI])) +
+    "원)이 직전 스윙 저점(" + won(loOf(bars[loI])) + "원)보다 높은 우상향 눌림목이야.";
+  return { ok: true, adj: 3, risePct: risePct, riseDays: riseDays, fallPct: fallPct, fallDays: fallDays,
+           rpd: rpd, fpd: fpd, note: note };
+}
+/* 3년 대시세 주의 — 시트 위험경고 문구로만 판별(점수 감점 없음) */
+function daeSeOf(r) {
+  return warnList(r).some(x => /3년\s*대시세/.test(x));
+}
+
 /* ── 수급 40% (0~100) ──
    RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고 */
 function supplyOf(r) {
@@ -1480,8 +1600,10 @@ function lineOf(r) {
   const base = convPart + posPart + trendPart + accPart + divPart;
   const bb = bandOf(r);
   const bbAdj = bb.boost + bb.heat;
-  const total = Math.round(clamp(base + bowl.adj + bbAdj, 0, 100));
-  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, total };
+  const mature = matureOf(r);
+  const angle = angleOf(r);
+  const total = Math.round(clamp(base + bowl.adj + bbAdj + mature.adj + angle.adj, 0, 100));
+  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, mature, angle, total };
 }
 
 /* ── 기업체력 20% (0~100): 기존 재무 점수 + 유보율·최대주주 안정성 ── */
@@ -1653,6 +1775,8 @@ async function syncChart() {
   if (chartState.status === "live") {
     bowlCache.clear();
     bandCache.clear();
+    matureCache.clear();
+    angleCache.clear();
     renderHero();
     renderReco();
     const sheet = document.getElementById("detail");
@@ -2414,6 +2538,9 @@ function cardHTML(r, pos) {
       (r.low52 != null ? '<span class="tag ' + (low52Flag(r) ? "t-red" : "") + '">52주저가 ' + pct(r.low52, 1) + '</span>' : "") +
       (marginFlag(r) === "credit" ? '<span class="tag t-teal">신용가능</span>' : (marginFlag(r) === "100" ? '<span class="tag t-amber">증거금100%</span>' : "")) +
       (r.years ? '<span class="tag">' + esc(r.years) + ' 연속</span>' : "") +
+      (ln.mature.ok ? '<span class="tag t-teal">224선 숙성 ' + ln.mature.days + '일</span>' : "") +
+      (ln.angle.ok ? '<span class="tag t-teal">각도술 완만 눌림</span>' : "") +
+      (daeSeOf(r) ? '<span class="tag t-amber">3년 대시세 주의</span>' : "") +
       (f.mcap != null ? '<span class="tag">시총 ' + capText(f.mcap) + '</span>' : "") +
     '</div>' +
     '<div class="sc-foot"><span>1차 <b>' + won(r.buy1) + '</b> · 2차 <b>' + won(r.buy2) + '</b></span><span class="stop">손절 ' + won(r.stop) + '</span></div>' +
@@ -2587,6 +2714,7 @@ function warnComment(w) {
   if (w.some(x => /장대음봉/.test(x))) out.push("거래량을 싣고 크게 밀린 날이 있었어. 물량이 나왔다는 뜻이라 추격 매수는 피하고 손절선을 짧게 잡아.");
   if (w.some(x => /윗꼬리/.test(x))) out.push("위에서 매물에 막혀 꼬리를 길게 남겼어. 그 고점을 다시 넘어서기 전엔 비중을 늘리지 마.");
   if (w.some(x => /2배/.test(x))) out.push("바닥에서 두 배 넘게 오른 자리야. 김정수 기준으로는 여기서부터가 추격 금지 구간이야.");
+  if (w.some(x => /3년\s*대시세/.test(x))) out.push("최근 3년 안에 저점 대비 +200% 이상 대시세(엘리엇 3파 급등)를 이미 지난 종목이야. 큰 파동 뒤 조정이 길게 이어질 수 있으니 신규 진입은 소액·분할로만 하고 224선 눌림을 확인하고 들어가.");
   return out.join(" ") || "위험 봉이 잡혔어. 한 번 더 확인하고 들어가자.";
 }
 function signalCardHTML(r) {
@@ -2773,7 +2901,7 @@ function openDetail(key) {
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>세력선(차트) 매력도</h3>' +
-      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정으로 100점</p>' +
+      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정 + 224선 숙성·각도술 보정으로 100점</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
         '<div class="big-gauge ' + gaugeClass(ln.total) + '" style="--p:' + ln.total + '"><span><b>' + ln.total + '</b><small>세력선 점수</small></span></div>' +
         '<div style="flex:1">' +
@@ -2785,10 +2913,15 @@ function openDetail(key) {
           '<div class="brk"><span>밥그릇 ' + esc(ln.bowl.seat || "—") + '번</span><i style="--w:' + barW(Math.max(0, ln.bowl.adj), 10) + '"></i><b>' + (ln.bowl.adj > 0 ? "+" : "") + ln.bowl.adj + '</b></div>' +
           (ln.bb.boost ? '<div class="brk"><span>볼린저·눌림</span><i style="--w:' + barW(ln.bb.boost, 9) + '"></i><b>+' + ln.bb.boost + '</b></div>' : '') +
           (ln.bb.heat ? '<div class="brk"><span>이격 과열</span><i class="neg" style="--w:' + barW(Math.abs(ln.bb.heat), 12) + '"></i><b>' + ln.bb.heat + '</b></div>' : '') +
+          (ln.mature.ok ? '<div class="brk"><span>224선 숙성 ' + ln.mature.days + '일</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.mature.adj + '</b></div>' : '') +
+          (ln.angle.ok ? '<div class="brk"><span>각도술 완만 눌림</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.angle.adj + '</b></div>' : '') +
         '</div>' +
       '</div>' +
       '<div class="note">' + esc(ln.bowl.note) + '</div>' +
       (ln.bb.note ? '<div class="tsum" style="color:var(--muted)">' + esc(ln.bb.note) + '</div>' : '') +
+      (ln.mature.ok ? '<div class="tsum" style="color:var(--teal)">🫙 224선 숙성 — ' + esc(ln.mature.note) + '</div>' : '') +
+      (ln.angle.ok ? '<div class="tsum" style="color:var(--teal)">📐 각도술 — ' + esc(ln.angle.note) + '</div>' : '') +
+      (daeSeOf(r) ? '<div class="note warn">📈 3년 대시세 주의 — 최근 3년(약 750거래일) 안에 최저점 대비 +200% 이상 대시세(엘리엇 3파 급등)를 이미 지난 종목이야. 큰 파동 뒤 조정이 길어질 수 있어서 추격 대신 224선 눌림에서 소액·분할로만 들어가.</div>' : '') +
     '</div>' +
     '<div class="card chartcard" id="chartCard" style="margin:12px 0">' + chartCardHTML(r) + '</div>' +
     '<div class="card" style="margin:12px 0">' +
@@ -2846,7 +2979,7 @@ function openDetail(key) {
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12 · 224선 숙성(80거래일+) +3 · 각도술 완만 눌림 +3 (100점 상한). 3년 대시세 주의는 점수를 깎지 않고 배지·코멘트로만 표시. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -3188,7 +3321,8 @@ function renderSetup() {
     '데이터: <a href="' + SHEET_URL + '" target="_blank" rel="noopener" style="color:var(--teal)">단테-세력선-추천</a> 구글 시트 (기준일 ' + esc(base || "—") + '). ' +
     '매매일지는 구글 시트 <b>매매일지</b> 탭을 함께 읽고(열 이름: 일자·구분·종목명·종목코드·단가·수량·금액·손절가·차수·근거 메모·복기 태그·한 줄 복기), 앱에서 직접 남긴 기록·설정은 이 브라우저(localStorage)에 저장돼. 같은 체결은 기기 기록을 우선하고, 시트에서 더한 행은 새로고침 때마다 바로 반영돼.<br>' +
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
-    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12) + <b>v1.9.0 볼린저·이격 보정</b>(볼린저 20일 밴드폭이 120일 하위 30%로 수축한 채 224선 위에서 20일선·하단선 지지 +5 · 120거래일 신고가 대비 -8~-25% 눌림해 224선 ±5% 안착 +4 · 224선 이격 +18% 이상 과열 −8~−12).<br>' +
+    'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12) + <b>v1.9.0 볼린저·이격 보정</b>(볼린저 20일 밴드폭이 120일 하위 30%로 수축한 채 224선 위에서 20일선·하단선 지지 +5 · 120거래일 신고가 대비 -8~-25% 눌림해 224선 ±5% 안착 +4 · 224선 이격 +18% 이상 과열 −8~−12) + <b>v1.10.0 숙성·각도술 보정</b>(종가가 224선 아래에서 80거래일(약 4개월) 이상 머문 뒤 돌파 +3 · 직전 스윙 상승 뒤 하락 각도가 완만하고 눌림 저점이 더 높은 우상향 눌림목 +3).<br>' +
+    '<b>v1.10.0 3년 대시세 주의</b> — 시트 <b>추천종목</b> 탭 AH열 <b>위험경고</b>에 `3년 대시세 주의`가 들어오면(최근 3년 내 최저점 대비 +200% 이상 대시세 이력) 카드에 📈 배지와 코멘트로만 표시하고 점수는 깎지 않아. 이미 큰 파동을 지난 종목이라는 뜻이라 추격 대신 224선 눌림에서 소액·분할로 들어가는 자리야.<br>' +
     '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·눌림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게. 차트의 <b>볼린저(20,2)</b> 토글을 켜면 상·하단(2σ)과 중심선(MA20)이 얇게 그려져.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
