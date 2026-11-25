@@ -731,7 +731,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.10.1";
+const APP_VERSION = "1.10.2";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const JOURNAL_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("매매일지") + "&tqx=out:csv";
 const LS = {
@@ -1545,6 +1545,63 @@ function angleCalc(r) {
   return { ok: true, adj: 3, risePct: risePct, riseDays: riseDays, fallPct: fallPct, fallDays: fallDays,
            rpd: rpd, fpd: fpd, note: note };
 }
+/* ══════════ v1.10.2 ⑥ 골파기 후 재안착 (2026-11-25 주식단테 '골파기 포착, 세력의 신호입니다') ══════════
+   · 최근 20거래일(당일 제외 직전 1~20거래일) 중, 세력선(224일선 우선, 없으면 112일선) 위에 있던
+     종가가 한 번 기준선 아래로 -1% 이상 이탈(골파기·개미 털기)해 위아래 흔들기를 만들고,
+   · 오늘 종가가 같은 기준선 위 0~+12% 안으로 다시 올라타면(재안착) 출발 신호로 보고 세력선 +3.
+   · 오늘 다시 기준선 아래로 깨졌거나 +12%를 넘어선 종목은 재안착으로 보지 않는다 — 실패하면 -7% 칼 손절. */
+const digCache = new Map();
+function digOf(r) {
+  const key = [r.code, r.price, r.ma112, r.ma224, chartState.fetchedAt || 0].join("|");
+  const hit = digCache.get(key);
+  if (hit) return hit;
+  const v = digCalc(r);
+  digCache.set(key, v);
+  return v;
+}
+function digCalc(r) {
+  const none = { ok: false, adj: 0, line: "", dev: null, dipDev: null, dipDate: null, dipLow: null,
+                 gap: null, aboveDays: 0, note: "" };
+  const bars = barsFor(r);
+  if (!bars || bars.length < 25) return none;
+  const n = bars.length, last = bars[n - 1];
+  const price = r.price || last.c;
+  /* 오늘 기준선 — 224일선 우선, 없으면 112일선 */
+  const lineNow = last.m224 != null ? { v: last.m224, k: "224선" }
+    : last.m112 != null ? { v: last.m112, k: "112선" }
+    : r.ma224 ? { v: r.ma224, k: "224선" }
+    : r.ma112 ? { v: r.ma112, k: "112선" } : null;
+  if (!lineNow || !price) return none;
+  const dev = (price - lineNow.v) / lineNow.v * 100;
+  /* 지금 기준선 아래로 깨졌거나 +12% 위로 과열이면 재안착으로 보지 않는다 */
+  if (!(dev >= 0 && dev <= 12)) return { ...none, line: lineNow.k, dev: dev };
+
+  /* 당일 제외 직전 20거래일 — 위 → 아래로 한 번 깨진 마지막 자리를 골파기로 잡는다 */
+  const w0 = Math.max(0, n - 21), w1 = n - 2;
+  const lineAt = (b) => b.m224 != null ? b.m224 : (b.m112 != null ? b.m112 : null);
+  let dipI = -1, above = 0;
+  for (let i = w0; i <= w1; i++) {
+    const L = lineAt(bars[i]);
+    if (L == null || !L) continue;
+    const d = (bars[i].c - L) / L * 100;
+    if (d > 0) above++;
+    else if (d <= -1 && above > 0) dipI = i;
+  }
+  if (dipI < 0) return { ...none, line: lineNow.k, dev: dev };
+
+  const bd = bars[dipI], Ld = lineAt(bd);
+  const dipDev = (bd.c - Ld) / Ld * 100;
+  const dipLow = (bd.l != null && Ld) ? (bd.l - Ld) / Ld * 100 : null;
+  const gap = n - 1 - dipI;
+  const dTxt = String(bd.d).slice(5);
+  const lowTxt = dipLow == null ? "" : "(장중 저가 " + fx(dipLow, 1) + "%)";
+  const note = "최근 20거래일 안 " + dTxt + "에 " + lineNow.k + " 아래 " + fx(dipDev, 1) + "%" + lowTxt +
+    "까지 골파기(개미 털기)가 나온 뒤, " + (gap <= 1 ? "오늘" : gap + "거래일 만에") + " 다시 " +
+    lineNow.k + " +" + fx(dev, 1) + "%로 재안착했어. 위아래 흔들기 뒤 다시 올라탄 자리는 출발 신호야 — 아래로 다시 깨지면 -7% 칼 손절.";
+  return { ok: true, adj: 3, line: lineNow.k, dev: dev, dipDev: dipDev, dipDate: String(bd.d),
+           dipLow: dipLow, gap: gap, aboveDays: above, note: note };
+}
+
 /* 3년 대시세 주의 — 시트 위험경고 문구로만 판별(점수 감점 없음) */
 function daeSeOf(r) {
   return warnList(r).some(x => /3년\s*대시세/.test(x));
@@ -1634,8 +1691,9 @@ function lineOf(r) {
   const bbAdj = bb.boost + bb.heat;
   const mature = matureOf(r);
   const angle = angleOf(r);
-  const total = Math.round(clamp(base + bowl.adj + bbAdj + mature.adj + angle.adj, 0, 100));
-  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, mature, angle, total };
+  const dig = digOf(r);
+  const total = Math.round(clamp(base + bowl.adj + bbAdj + mature.adj + angle.adj + dig.adj, 0, 100));
+  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, mature, angle, dig, total };
 }
 
 /* ── 기업체력 20% (0~100): 기존 재무 점수 + 유보율·최대주주 안정성 ── */
@@ -1809,6 +1867,7 @@ async function syncChart() {
     bandCache.clear();
     matureCache.clear();
     angleCache.clear();
+    digCache.clear();
     renderHero();
     renderReco();
     const sheet = document.getElementById("detail");
@@ -2572,6 +2631,7 @@ function cardHTML(r, pos) {
       (r.years ? '<span class="tag">' + esc(r.years) + ' 연속</span>' : "") +
       (ln.mature.ok ? '<span class="tag t-teal">224선 숙성 ' + ln.mature.days + '일</span>' : "") +
       (ln.angle.ok ? '<span class="tag t-teal">각도술 완만 눌림</span>' : "") +
+      (ln.dig.ok ? '<span class="tag t-teal">🕳️ 골파기 재안착</span>' : "") +
       (daeSeOf(r) ? '<span class="tag t-amber">3년 대시세 주의</span>' : "") +
       (f.mcap != null ? '<span class="tag">시총 ' + capText(f.mcap) + '</span>' : "") +
     '</div>' +
@@ -2939,7 +2999,7 @@ function openDetail(key) {
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>세력선(차트) 매력도</h3>' +
-      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정 + 224선 숙성·각도술 보정으로 100점</p>' +
+      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정 + 224선 숙성·각도술 보정 + 골파기 재안착 보정으로 100점</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
         '<div class="big-gauge ' + gaugeClass(ln.total) + '" style="--p:' + ln.total + '"><span><b>' + ln.total + '</b><small>세력선 점수</small></span></div>' +
         '<div style="flex:1">' +
@@ -2953,12 +3013,14 @@ function openDetail(key) {
           (ln.bb.heat ? '<div class="brk"><span>이격 과열</span><i class="neg" style="--w:' + barW(Math.abs(ln.bb.heat), 12) + '"></i><b>' + ln.bb.heat + '</b></div>' : '') +
           (ln.mature.ok ? '<div class="brk"><span>224선 숙성 ' + ln.mature.days + '일</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.mature.adj + '</b></div>' : '') +
           (ln.angle.ok ? '<div class="brk"><span>각도술 완만 눌림</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.angle.adj + '</b></div>' : '') +
+          (ln.dig.ok ? '<div class="brk"><span>골파기 재안착</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.dig.adj + '</b></div>' : '') +
         '</div>' +
       '</div>' +
       '<div class="note">' + esc(ln.bowl.note) + '</div>' +
       (ln.bb.note ? '<div class="tsum" style="color:var(--muted)">' + esc(ln.bb.note) + '</div>' : '') +
       (ln.mature.ok ? '<div class="tsum" style="color:var(--teal)">🫙 224선 숙성 — ' + esc(ln.mature.note) + '</div>' : '') +
       (ln.angle.ok ? '<div class="tsum" style="color:var(--teal)">📐 각도술 — ' + esc(ln.angle.note) + '</div>' : '') +
+      (ln.dig.ok ? '<div class="tsum" style="color:var(--teal)">🕳️ 골파기 재안착 — ' + esc(ln.dig.note) + '</div>' : '') +
       (daeSeOf(r) ? '<div class="note warn">📈 3년 대시세 주의 — 최근 3년(약 750거래일) 안에 최저점 대비 +200% 이상 대시세(엘리엇 3파 급등)를 이미 지난 종목이야. 큰 파동 뒤 조정이 길어질 수 있어서 추격 대신 224선 눌림에서 소액·분할로만 들어가.</div>' : '') +
     '</div>' +
     '<div class="card chartcard" id="chartCard" style="margin:12px 0">' + chartCardHTML(r) + '</div>' +
@@ -3036,7 +3098,7 @@ function openDetail(key) {
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12 · 224선 숙성(80거래일+) +3 · 각도술 완만 눌림 +3 (100점 상한). 3년 대시세 주의는 점수를 깎지 않고 배지·코멘트로만 표시. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12 · 224선 숙성(80거래일+) +3 · 각도술 완만 눌림 +3 · 골파기 후 재안착(최근 20거래일 내 224선 -1% 이탈 뒤 0~+12% 재안착) +3 (100점 상한). 3년 대시세 주의는 점수를 깎지 않고 배지·코멘트로만 표시. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -3421,6 +3483,7 @@ function renderSetup() {
     'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12) + <b>v1.9.0 볼린저·이격 보정</b>(볼린저 20일 밴드폭이 120일 하위 30%로 수축한 채 224선 위에서 20일선·하단선 지지 +5 · 120거래일 신고가 대비 -8~-25% 눌림해 224선 ±5% 안착 +4 · 224선 이격 +18% 이상 과열 −8~−12) + <b>v1.10.0 숙성·각도술 보정</b>(종가가 224선 아래에서 80거래일(약 4개월) 이상 머문 뒤 돌파 +3 · 직전 스윙 상승 뒤 하락 각도가 완만하고 눌림 저점이 더 높은 우상향 눌림목 +3).<br>' +
     '<b>v1.10.0 3년 대시세 주의</b> — 시트 <b>추천종목</b> 탭 AH열 <b>위험경고</b>에 `3년 대시세 주의`가 들어오면(최근 3년 내 최저점 대비 +200% 이상 대시세 이력) 카드에 📈 배지와 코멘트로만 표시하고 점수는 깎지 않아. 이미 큰 파동을 지난 종목이라는 뜻이라 추격 대신 224선 눌림에서 소액·분할로 들어가는 자리야.<br>' +
     '<b>v1.10.1 기간 에너지별 분할 익절</b> — 차트의 힘은 파동 에너지 + 기간 에너지야. <b>짧은 수렴(1개월 미만)</b>은 1차 목표 +15~20%에서 전량 익절해 빠르게 회전하고, <b>긴 숙성(224선 아래 80거래일 이상 또는 볼린저 밴드폭 120일 하위 30% 수축)</b>은 1차 목표 +20%에서 50%만 절반 익절한 뒤 나머지 50%는 손절가를 본절(매수가) 위로 올려 장대양봉 2~3파동(5일선 이탈 전까지) 추세를 추적해. 상세 목표가 카드와 매매일지 보유 종목에 1차 목표가·절반 수량이 자동 계산돼. 앱 차트가 120봉까지만 보므로 그보다 긴 숙성은 화·목 스캔이 시트 근거에 적은 `224선 아래 N거래일 숙성`을 함께 읽어 긴 숙성으로 판정해.<br>' +
+    '<b>v1.10.2 골파기 후 재안착</b> — 차트데이터 120봉으로 <b>최근 20거래일(당일 제외)</b> 안에 세력선(224선 우선, 없으면 112선) 위에 있던 종가가 한 번 <b>-1% 이상 아래로 이탈(골파기·개미 털기)</b>했다가, 오늘 다시 같은 선 위 <b>0~+12%</b>로 올라탄 종목에 세력선 <b>+3</b>을 줘. 위아래 흔들기 뒤 재안착은 출발 신호지만, 아래로 다시 깨지면 바로 손절이야 — 그래서 오늘 다시 선 아래로 내려온 종목은 가점 없이 제외해. 배지와 세력선 점수 근거에 `골파기 재안착`으로 표시돼.<br>' +
     '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·눌림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게. 차트의 <b>볼린저(20,2)</b> 토글을 켜면 상·하단(2σ)과 중심선(MA20)이 얇게 그려져.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
