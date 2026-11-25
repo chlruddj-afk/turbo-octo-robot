@@ -538,7 +538,7 @@ table.t tr:last-child td{border-bottom:none}
         <div class="grow"><b>유보율</b><span>사내 유보금</span><i>자본금 대비 쌓아둔 유보금. 300% 이상이면 배당·위기에 쓸 여유가 있다는 뜻</i></div>
         <div class="grow"><b>최대주주</b><span>지분율</span><i>최대주주+특수관계인 지분. 30% 이상이면 경영권이 안정적</i></div>
         <div class="grow"><b>눌림 거래량</b><span>김정수</span><i>매집봉 뒤 거래량이 1/3 이하로 말라면 세력이 안 빠졌다는 신호</i></div>
-        <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10).<br>총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2, 100점 만점). 위 카드에서 수급·세력선·기업체력 점수를 나란히 보면 “세력이 붙었는데 재무가 어떤지” 한눈에 보여.<br>나가는 기준은 1차 +20%에서 절반 익절, -7%나 224선 이탈이면 교체.</p>
+        <p class="hint" style="margin:10px 0 0">기업 체력 100점 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10).<br>총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2, 100점 만점). 위 카드에서 수급·세력선·기업체력 점수를 나란히 보면 “세력이 붙었는데 재무가 어떤지” 한눈에 보여.<br>나가는 기준은 숙성 기간을 따라 — 짧은 수렴(1개월 미만)은 +15~20%에서 전량, 긴 숙성(224선 80거래일↑·볼린저 수축)은 +20%에서 절반 익절 후 나머지는 5일선까지. -7%나 224선 이탈이면 교체.</p>
       </div>
     </section>
 
@@ -551,6 +551,7 @@ table.t tr:last-child td{border-bottom:none}
       <p class="hint" id="jSync" style="margin:-6px 0 10px"></p>
       <div id="sectorWarnJournal"></div>
       <div class="stat-grid" id="jSummary"></div>
+      <div class="card" id="jSplit"></div>
       <div class="card" id="j3m"></div>
 
       <div class="card">
@@ -730,7 +731,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.10.1";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const JOURNAL_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("매매일지") + "&tqx=out:csv";
 const LS = {
@@ -1399,6 +1400,26 @@ function bandCalc(r) {
   return { ok: true, price: price, dev: dev, bw: bw, bwPct: bwPct, mid: cur.mid, up: cur.up, lo: cur.lo,
            squeeze: squeeze, sqAdj: sqAdj, highAdj: highAdj, heat: heat, boost: sqAdj + highAdj,
            drop: drop, hiDate: hiIdx >= 0 ? bars[hiIdx].d : null, note: bits.join(" · ") };
+}
+
+/* ══════════ v1.10.1 기간 에너지(숙성 기간)별 분할 익절 ══════════
+   · 짧은 수렴(1개월 미만): 1차 목표(+15~20%)에서 전량 익절 후 빠른 회전.
+   · 긴 숙성(224선 아래 80거래일 이상 숙성 또는 볼린저 밴드폭 120일 하위 30% 수축):
+     1차 목표(+20%)에서 50% 절반 익절, 나머지 50%는 손절가를 본절(매수가) 위로 올려
+     장대양봉 2~3파동(5일선 이탈 전까지) 추세 추적. */
+function ripenOf(r, ln) {
+  const reasons = [];
+  const days = ln && ln.mature && ln.mature.ok ? ln.mature.days : 0;
+  if (days >= 80) reasons.push("224선 아래 " + days + "거래일 숙성");
+  const bwPct = ln && ln.bb && ln.bb.ok ? ln.bb.bwPct : null;
+  if (bwPct != null && bwPct <= 30) reasons.push("볼린저 밴드폭 120일 하위 " + Math.round(bwPct) + "% 수축");
+  return { ok: reasons.length > 0, days: days, bwPct: bwPct, reasons: reasons };
+}
+/* 목표가는 5,000원 이상 호가 단위(10원)에 맞춰 반올림 */
+function tpOf(entry, pct) {
+  if (!entry) return null;
+  const v = entry * (1 + pct / 100);
+  return v >= 1000 ? Math.round(v / 10) * 10 : Math.round(v);
 }
 
 /* ══════════ v1.10.0 224선 숙성(80거래일) / 각도술 완만 눌림 / 3년 대시세 주의 ══════════
@@ -2871,6 +2892,12 @@ function openDetail(key) {
   const dev = ln.dev224;
   const buyGap = (b) => (b && r.price) ? ((b - r.price) / r.price * 100) : null;
   const stopGap = (r.stop && r.price) ? ((r.stop - r.price) / r.price * 100) : null;
+  const rp = ripenOf(r, ln);
+  const held = holdings().filter(h => h.qty > 0 && (h.code || h.name) === (r.code || r.name))[0];
+  const entry = (held && held.avg) ? held.avg : r.buy1;
+  const holdQty = held ? held.qty : 0;
+  const tp15 = tpOf(entry, 15), tp20 = tpOf(entry, 20);
+  const halfQty = holdQty ? Math.floor(holdQty / 2) : 0;
   const barW = (v, max) => clamp(v / max * 100, 0, 100).toFixed(0) + "%";
   const html =
     '<div class="sheet-grab"></div>' +
@@ -2955,14 +2982,33 @@ function openDetail(key) {
       '<div class="row"><button class="btn primary" data-act="journalFrom" data-code="' + esc(r.code || r.name) + '">이 종목 매수 기록</button></div>' +
     '</div>' +
     '<div class="card" style="margin:12px 0">' +
+      '<h3>🎯 기간 에너지별 분할 익절</h3>' +
+      '<p class="hint">차트의 힘 = 파동(모양) 에너지 + 기간(응축) 에너지. 오래 눌러 숙성한 자리일수록 목표 파동이 길어서 익절도 나눠.</p>' +
+      '<div class="ladder">' +
+        '<div class="lad b1"><span class="t">짧은 수렴</span><span class="v">+15~20%<small>전량 익절</small></span><span class="g">1개월 미만 · 빠른 회전</span></div>' +
+        '<div class="lad b2"><span class="t">긴 숙성</span><span class="v">+20%에서 50%<small>나머지는 추세 추적</small></span><span class="g">224선 80일↑ · 볼린저 수축</span></div>' +
+        '<div class="lad stop"><span class="t">추적</span><span class="v">손절가 → 본절 위<small>5일선 이탈 전까지</small></span><span class="g">장대양봉 2~3파동</span></div>' +
+      '</div>' +
+      '<div class="kv" style="margin-top:10px">' +
+        '<div><span>1차 목표(+15%)</span><b>' + (tp15 ? won(tp15) + '원' : '—') + '</b></div>' +
+        '<div><span>1차 목표(+20%)</span><b>' + (tp20 ? won(tp20) + '원' : '—') + '</b></div>' +
+        '<div><span>절반 익절 수량</span><b>' + (holdQty ? halfQty + '주 / ' + holdQty + '주' : '보유 수량의 50%') + '</b></div>' +
+        '<div><span>본절 상향 기준</span><b>' + (entry ? won(Math.round(entry)) + '원 위' : '—') + '</b></div>' +
+      '</div>' +
+      (rp.ok
+        ? '<div class="tsum" style="color:var(--teal)">🫙 이 종목은 <b>긴 숙성</b> — ' + esc(rp.reasons.join(' · ')) + ' → +20%(' + (tp20 ? won(tp20) + '원' : '1차 목표') + ')에서 ' + (halfQty ? halfQty + '주(50%)' : '50%') + ' 익절, 나머지는 손절가를 ' + (entry ? won(Math.round(entry)) + '원(본절) 위' : '본절') + '로 올리고 5일선 이탈 전까지 추세 추적.</div>'
+        : '<div class="tsum" style="color:var(--muted)">1개월 넘게 수렴하거나 볼린저가 수축한 신호가 아직 없어 — <b>짧은 수렴</b> 쪽으로 보고 +15~20%에서 전량 익절한 뒤 다음 밥그릇으로 회전.</div>') +
+      '<div class="note">짧은 수렴은 1차 목표에서 다 챙겨 몸을 가볍게 하고, 긴 숙성은 절반만 챙긴 뒤 나머지를 5일선 위에 태워 2~3파동까지 먹는 방식이야. 절반 익절한 순간 손절가를 본절(매수가) 위로 올려두면 남은 절반은 잃지 않는 추세 베팅이 돼.</div>' +
+    '</div>' +
+    '<div class="card" style="margin:12px 0">' +
       '<h3>익절 · 손절 원칙</h3>' +
       '<p class="hint">RS가 강해도 사는 값이 틀리면 손실이 나. 나가고 들어오는 기준을 먼저 정해둬.</p>' +
       '<div class="ladder">' +
-        '<div class="lad b1"><span class="t">1차 익절</span><span class="v">+20%<small>에서 절반</small></span><span class="g">나머지는 224선까지</span></div>' +
+        '<div class="lad b1"><span class="t">1차 익절</span><span class="v">' + (rp.ok ? '+20%<small>에서 50% 절반</small>' : '+15~20%<small>에서 전량</small>') + '</span><span class="g">' + (rp.ok ? '나머지 5일선까지' : '숙성 짧으면 회전') + '</span></div>' +
         '<div class="lad stop"><span class="t">손절</span><span class="v">-7%<small> · 224선 종가 이탈</small></span><span class="g">미련 없이 교체</span></div>' +
         '<div class="lad b2"><span class="t">교체</span><span class="v">RS 강함<small> · 수렴 낮은 곳</small></span><span class="g">손절 자금 이동</span></div>' +
       '</div>' +
-      '<div class="note">반 토막은 익절하고 남은 반은 세력선을 따라가 — 오르는 종목을 일찍 다 팔아버리는 후회를 줄이는 방법이야. -7%에 닿으면 이유를 따지지 말고 정리하고, 그 돈은 코스피보다 강하면서 세 선이 붙은 다른 종목으로 옮겨.</div>' +
+      '<div class="note">반 토막은 익절하고 남은 반은 세력선을 따라가 — 오르는 종목을 일찍 다 팔아버리는 후회를 줄이는 방법이야. 단, 224선 80거래일 이상 숙성이나 볼린저 수축 없이 1개월 안쪽으로 짧게 수렴한 자리는 +15~20%에서 전량 정리해. -7%에 닿으면 이유를 따지지 말고 정리하고, 그 돈은 코스피보다 강하면서 세 선이 붙은 다른 종목으로 옮겨.</div>' +
     '</div>' +
     '<div class="card" style="margin:12px 0">' +
       '<h3>매집봉 · 배당</h3>' +
@@ -3192,7 +3238,47 @@ function renderJournal() {
     }).join("");
   }
   renderCoach(hs, ts);
+  renderSplitGuide(hs);
   render3M();
+}
+/* 보유 종목별 기간 에너지 분할 익절 — 평단 기준 1차 목표가·절반 수량을 바로 계산 */
+function renderSplitGuide(hs) {
+  const el = $("#jSplit");
+  if (!el) return;
+  const list = (hs || holdings().filter(h => h.qty > 0));
+  const rows = list.map(h => {
+    const r = h.row || findRow(h.code || h.name);
+    const rp = r ? ripenOf(r, totalOf(r).line) : { ok: false, reasons: [] };
+    const tp15 = tpOf(h.avg, 15), tp20 = tpOf(h.avg, 20);
+    const half = Math.floor(h.qty / 2);
+    const gap = (h.price && tp20) ? (tp20 - h.price) / h.price * 100 : null;
+    return '<div style="padding:11px 0;border-bottom:1px solid rgba(36,49,73,.6)">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">' +
+        '<b style="font-size:13px">' + esc(h.name) + '</b>' +
+        '<span style="font-size:10.5px;color:var(--dim)">' + won(h.qty) + '주 · 평단 ' + won(Math.round(h.avg)) + '원' +
+          (h.price ? ' · 현재 ' + won(h.price) + '원' : '') + '</span>' +
+      '</div>' +
+      '<div class="kv" style="margin-top:7px">' +
+        '<div><span>1차 목표(+15%)</span><b>' + won(tp15) + '원</b></div>' +
+        '<div><span>1차 목표(+20%)</span><b>' + won(tp20) + '원</b></div>' +
+        '<div><span>절반 익절</span><b>' + half + '주 / ' + won(h.qty) + '주</b></div>' +
+        '<div><span>본절 상향</span><b>' + won(Math.round(h.avg)) + '원 위</b></div>' +
+      '</div>' +
+      (rp.ok
+        ? '<div class="tsum" style="color:var(--teal)">🫙 긴 숙성 — ' + esc(rp.reasons.join(' · ')) + ' → +20%(' + won(tp20) + '원)에서 ' + half + '주(50%) 익절, 나머지 ' + (h.qty - half) + '주는 손절가를 ' + won(Math.round(h.avg)) + '원 위로 올리고 5일선 이탈 전까지.</div>'
+        : '<div class="tsum" style="color:var(--muted)">짧은 수렴 — +15~20%(' + won(tp15) + '~' + won(tp20) + '원)에서 전량 익절 후 다음 밥그릇으로 회전.</div>') +
+      (gap != null ? '<div class="tsum">1차 목표(+20%)까지 현재가에서 ' + pct(gap) + '</div>' : '') +
+    '</div>';
+  }).join("");
+  el.innerHTML =
+    '<h3>🎯 보유 종목 분할 익절</h3>' +
+    '<p class="hint">숙성 기간에 따라 익절 폭을 나눠 — 평단 기준으로 바로 계산해</p>' +
+    '<div class="ladder">' +
+      '<div class="lad b1"><span class="t">짧은 수렴</span><span class="v">+15~20%<small>전량 익절</small></span><span class="g">1개월 미만 · 빠른 회전</span></div>' +
+      '<div class="lad b2"><span class="t">긴 숙성</span><span class="v">+20%에서 50%<small>나머지는 추세 추적</small></span><span class="g">224선 80일↑ · 볼린저 수축</span></div>' +
+      '<div class="lad stop"><span class="t">추적</span><span class="v">손절가 → 본절 위<small>5일선 이탈 전까지</small></span><span class="g">장대양봉 2~3파동</span></div>' +
+    '</div>' +
+    (rows || '<div class="empty" style="padding:16px 8px">보유 종목이 없어. 매수 기록을 남기면 평단 기준 목표가와 절반 수량이 여기에 나와.</div>');
 }
 function renderCoach(hs, ts) {
   const rows = allRows();
@@ -3325,6 +3411,7 @@ function renderSetup() {
     '세력선 = 종가 단순이동평균 112·224·448일선, 매집봉 = 최근 30거래일 중 양봉이면서 거래량이 직전 20일 평균의 2배 이상인 날.<br>' +
     'v1.7.0 총 매력도는 4:4:2 — <b>수급 40% + 세력선 40% + 기업체력 20%</b>. 수급 = RS 35 + 눌림 거래량 25(33% 이하 만점) + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 추세 돌파 양봉 10 − 위험경고(장대음봉 8·윗꼬리 음봉 6·52주 신저가 8). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 연장 +4 · 2번 +2 · 1번 −10 · 4번 −12) + <b>v1.9.0 볼린저·이격 보정</b>(볼린저 20일 밴드폭이 120일 하위 30%로 수축한 채 224선 위에서 20일선·하단선 지지 +5 · 120거래일 신고가 대비 -8~-25% 눌림해 224선 ±5% 안착 +4 · 224선 이격 +18% 이상 과열 −8~−12) + <b>v1.10.0 숙성·각도술 보정</b>(종가가 224선 아래에서 80거래일(약 4개월) 이상 머문 뒤 돌파 +3 · 직전 스윙 상승 뒤 하락 각도가 완만하고 눌림 저점이 더 높은 우상향 눌림목 +3).<br>' +
     '<b>v1.10.0 3년 대시세 주의</b> — 시트 <b>추천종목</b> 탭 AH열 <b>위험경고</b>에 `3년 대시세 주의`가 들어오면(최근 3년 내 최저점 대비 +200% 이상 대시세 이력) 카드에 📈 배지와 코멘트로만 표시하고 점수는 깎지 않아. 이미 큰 파동을 지난 종목이라는 뜻이라 추격 대신 224선 눌림에서 소액·분할로 들어가는 자리야.<br>' +
+    '<b>v1.10.1 기간 에너지별 분할 익절</b> — 차트의 힘은 파동 에너지 + 기간 에너지야. <b>짧은 수렴(1개월 미만)</b>은 1차 목표 +15~20%에서 전량 익절해 빠르게 회전하고, <b>긴 숙성(224선 아래 80거래일 이상 또는 볼린저 밴드폭 120일 하위 30% 수축)</b>은 1차 목표 +20%에서 50%만 절반 익절한 뒤 나머지 50%는 손절가를 본절(매수가) 위로 올려 장대양봉 2~3파동(5일선 이탈 전까지) 추세를 추적해. 상세 목표가 카드와 매매일지 보유 종목에 1차 목표가·절반 수량이 자동 계산돼.<br>' +
     '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·눌림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게. 차트의 <b>볼린저(20,2)</b> 토글을 켜면 상·하단(2σ)과 중심선(MA20)이 얇게 그려져.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
