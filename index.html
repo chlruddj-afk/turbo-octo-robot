@@ -1736,12 +1736,16 @@ function jbnCalc(r) {
   const swAdj = (delta != null && delta >= 15) ? 4 : 0;
   const adj = lvAdj + swAdj;
   const sell = pct < 30;
+  const hits = [];
+  if (lvAdj) hits.push("224선 위 매수 지분이 60%를 넘어 우위(+3)");
+  else if (sell) hits.push("224선 아래 공간이 압도적이라 매도 지분 우위(감점 없이 배지만)");
+  else hits.push("매수·매도 지분이 반반에 가까움");
+  if (swAdj) hits.push("60일 사이 지분이 매수 쪽으로 +" + fx(delta, 1) + "%p 넘어오는 전환 자리(+4)");
+  else if (delta != null && delta < 0) hits.push("60일 사이 지분이 " + fx(delta, 1) + "%p 줄어 힘이 빠지는 중");
+  else if (delta != null) hits.push("60일 전환은 +" + fx(delta, 1) + "%p로 아직 뚜렷하지 않음");
   const note = "최근 " + win.length + "거래일 중 종가가 224선 위에 있던 봉이 " + aboveN + "일(" + fx(pct, 0) + "%)" +
-    (delta == null ? "" : " — 최근 60봉 " + fx(recent, 0) + "% vs 직전 60봉 " + fx(prior, 0) + "%로 " +
-      (delta >= 0 ? "+" : "") + fx(delta, 1) + "%p 전환") +
-    (sell ? ". 224선 아래 공간이 압도적이야 — 매도 지분 우위라 아직 살 자리가 아니야(감점은 없음)."
-          : adj ? ". 224선 위에 쌓인 매수 지분이 우위야" + (swAdj ? " — 지분이 60일 사이 매수 쪽으로 넘어온 전환 자리" : "") + "."
-                : ". 매수·매도 지분이 반반에 가까워 추세 판정은 아직이야.");
+    (delta == null ? "" : " — 최근 60봉 " + fx(recent, 0) + "% vs 직전 60봉 " + fx(prior, 0) + "%") +
+    ". " + hits.join(" · ") + ".";
   return { ok: adj > 0, pct: pct, recent: recent, prior: prior, delta: delta, days: win.length, adj: adj,
            sell: sell, aboveN: aboveN, note: note };
 }
@@ -1881,9 +1885,8 @@ function supplyNote(r, s) {
     if (s.boxAcc != null) bits.push("바닥·박스권 매집 " + s.boxAcc + "회");
     bits.push(s.brk ? "추세 돌파 양봉 있음" : "추세 돌파 양봉 없음");
   }
-  if (s.jbn && s.jbn.pct != null) bits.push("224선 지분 " + fx(s.jbn.pct, 0) + "%" +
-    (s.jbn.delta == null ? "" : " · 60일 전환 " + (s.jbn.delta >= 0 ? "+" : "") + fx(s.jbn.delta, 1) + "%p") +
-    (s.jbn.sell ? " 매도 우위" : ""));
+  if (s.jbn && s.jbn.pct != null) bits.push("224선 지분 " + fx(s.jbn.pct, 0) + "%" + (s.jbn.sell ? "(매도 우위)" : "") +
+    (s.jbn.delta == null ? "" : " · 60일 전환 " + (s.jbn.delta >= 0 ? "+" : "") + fx(s.jbn.delta, 1) + "%p"));
   if (s.warnAdj) bits.push("위험경고 −" + s.warnAdj);
   return bits.join(" · ");
 }
@@ -3221,7 +3224,7 @@ function openDetail(key) {
       '</div>' +
       '<div class="tsum" style="margin-top:9px">밥그릇: <b>' + esc(ln.bowl.name) + '</b> — ' + esc(ln.bowl.note) + '</div>' +
       '<div class="tsum">수급(수박 참고용): ' + esc(supplyNote(r, sup)) + ' → <b>' + sup.total + '점</b></div>' +
-      (sup.jbn.pct != null ? '<div class="tsum" style="color:' + (sup.jbn.sell ? "var(--red)" : sup.jbn.adj ? "var(--teal)" : "var(--muted)") + '">🎯 지분(持分) — ' + esc(sup.jbn.note) + (sup.jbn.adj ? ' → +' + sup.jbn.adj : '') + '</div>' : '') +
+      (sup.jbn.pct != null ? '<div class="tsum" style="color:' + (sup.jbn.sell ? "var(--red)" : sup.jbn.adj ? "var(--teal)" : "var(--muted)") + '">🎯 지분(持分) — ' + esc(sup.jbn.note) + (sup.jbn.adj ? ' 수급 +' + sup.jbn.adj : '') + '</div>' : '') +
       '<div class="cmpv ' + cv.cls + '" style="margin:12px 0 0">' + cv.text + '</div>' +
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
