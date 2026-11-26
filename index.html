@@ -3660,15 +3660,15 @@ function scenarioOf(h) {
   if (lossPct != null && lossPct <= hd.loss) {
     verdict = { cls: "t-red", text: "시나리오 이탈" };
     msgs.push({ lv: "warn", t: esc(h.name) + " 현재 " + pct(lossPct) + "로 네가 정한 견딜 손실 " + hd.loss + "%를 넘었어. 생각과 다르면 기계적으로 자르는 게 원칙이야 — 시나리오 이탈, 원칙대로 정리 검토." });
-  } else if (days != null && days > hd.days) {
-    verdict = { cls: "t-red", text: "시나리오 초과" };
-    msgs.push({ lv: "warn", t: esc(h.name) + " 매수 후 " + days + "거래일로 견딜 기간 " + hd.days + "거래일을 넘었어. 시간 손절 검토 — 오르지 않는 자리에 돈을 묶어두지 마." });
   } else if (longSeat && days != null && days >= 60 && peakPct != null && peakPct < 20) {
     verdict = { cls: "t-amber", text: "시간 손절 검토" };
     msgs.push({ lv: "warn", t: esc(h.name) + " — 긴 숙성 자리인데 매수 후 " + days + "거래일 동안 고점 수익이 " + pct(peakPct) + "야. 6개월 내 +20% 미달이면 교체가 단테 기준이라 시간 손절을 검토해." });
   } else if (!longSeat && days != null && days >= 10 && peakPct != null && peakPct < 15) {
     verdict = { cls: "t-amber", text: "회전 검토" };
     msgs.push({ lv: "tip", t: esc(h.name) + " — 짧은 수렴 자리에서 " + days + "거래일이 지났는데 고점이 " + pct(peakPct) + "야. +15~20%를 못 주는 자리면 전량 익절하고 다음 밥그릇으로 회전할 때야." });
+  } else if (days != null && days > hd.days) {
+    verdict = { cls: "t-red", text: "시나리오 초과" };
+    msgs.push({ lv: "warn", t: esc(h.name) + " 매수 후 " + days + "거래일로 견딜 기간 " + hd.days + "거래일을 넘었어. 시간 손절 검토 — 오르지 않는 자리에 돈을 묶어두지 마." });
   }
   if (!verdict) {
     verdict = { cls: "t-teal", text: "시나리오 안" };
