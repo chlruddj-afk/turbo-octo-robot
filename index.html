@@ -1968,6 +1968,8 @@ function volCalc(r) {
     else if (dev224 < 25) tri = { pct: 50, label: "비중 50%" };
     else if (dev224 < 35) tri = { pct: 30, label: "비중 30%" };
     else tri = { pct: 0, label: "추격 금지" };
+    /* 224선 −2% 아래는 비중을 잡지 않는다(단테: 선 아래는 사지 않는다) */
+    if (below.ok) tri = { pct: 0, label: "선 아래 — 비중 0%" };
     tri.dev = dev224;
   }
 
@@ -2264,6 +2266,8 @@ async function syncChart() {
     volCache.clear();
     renderHero();
     renderReco();
+    renderJournal();
+    renderIsa();
     const sheet = document.getElementById("detail");
     if (!hadChart && sheet && !sheet.classList.contains("hidden") && chartState.row) {
       openDetail(chartState.row.code || chartState.row.name);
@@ -3045,7 +3049,7 @@ function cardHTML(r, pos) {
       (v.dodge.ok ? '<span class="tag t-teal">도지 전환 +2</span>' : "") +
       (v.prevLow.ok ? '<span class="tag t-red">📉 전저점 이탈</span>' : "") +
       (v.below.ok && !(ln.dig.ok || ln.ymp.adj) ? '<span class="tag t-red">224선 −2% 아래 — 추격 금지</span>' : "") +
-      (v.tri ? '<span class="tag ' + (v.tri.pct === 0 ? "t-red" : v.tri.pct <= 50 ? "t-amber" : "t-blue") + '">🎯 ' + esc(v.tri.label) + '</span>' : "") +
+      (v.tri && !v.below.ok ? '<span class="tag ' + (v.tri.pct === 0 ? "t-red" : v.tri.pct <= 50 ? "t-amber" : "t-blue") + '">🎯 ' + esc(v.tri.label) + '</span>' : "") +
       (s.jbn.pct != null ? (s.jbn.sell
         ? '<span class="tag t-red">지분 ' + fx(s.jbn.pct, 0) + '% 매도 우위</span>'
         : '<span class="tag ' + (s.jbn.adj ? "t-teal" : "") + '">지분 ' + fx(s.jbn.pct, 0) + '%' +
