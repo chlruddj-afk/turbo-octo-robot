@@ -731,7 +731,7 @@ const SHEET_ID = "1NSHukx0xs_ZO3bYTXz4TDIFvjOaxsUkjdIyjsVK_MN8";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit";
 const CSV_PRIMARY = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv";
 const CSV_BACKUP  = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv";
-const APP_VERSION = "1.10.2";
+const APP_VERSION = "1.11.0";
 const MARKET_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("시장지표") + "&tqx=out:csv";
 const JOURNAL_CSV = "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?sheet=" + encodeURIComponent("매매일지") + "&tqx=out:csv";
 const LS = {
@@ -1602,6 +1602,212 @@ function digCalc(r) {
            dipLow: dipLow, gap: gap, aboveDays: above, note: note };
 }
 
+/* ══════════ v1.11.0 ⑦ 역매공파 · ⑧ 지분(持分) · ⑨ 박스권 필터 ══════════
+   2026-11-26 주식단테 재생목록 3개('스윙은 역매공파로 끝' · '지분(持分)기법' · '박스권 매매')를
+   차트데이터 120봉 + 시트 세력선 열만으로 판정한다(새 열 없음).
+   ⑦ 역매공파(세력선 +8 / 근접 +4)
+      ① 역배열 448>224>112 ② 112선 −3~+5% 근접 ③ 단기 정배열 5>20>60
+      ④ 최근 20봉 매집봉(양봉 + 20일평균 2배) ⑤ 공구리(60봉 저점 대비 +3~+15% & 최근 10봉 고저폭 8% 이하)
+      ⑥ 볼린저 중심선(20일선) 위 + 밴드폭 120일 하위 30%  →  6개 중 5개 이상 '성립' +8, 4개 '근접' +4
+      예외: 52주 신저가 경고 종목 제외 / 224선 위로 재안착(현재가 > 224선)한 경우만 인정 /
+            224선 이격 과열 감점(−8~−12)이 걸리면 가점 없음(감점 우선).
+   ⑧ 지분율 = 최근 120봉 중 종가 > 그날 MA224 인 봉 비율(수급 40점 안)
+      지분율 ≥60% +3 · 최근 60봉 지분율 − 직전 60봉 지분율 ≥ +15%p +4 (중복 최대 +7)
+      지분율 <30%면 '매도 지분 우위' 배지(감점 없음).
+   ⑨ 박스권 필터(세력선 안)
+      늦은 돌파 주의 −4: 최근 40봉 내 224선 ±1.5% 터치 3회 이상 + 지금 224선 위 0~+8% 돌파 중
+        (단, 같은 자리에서 골파기 후 재안착이 인정되면 재안착을 우선해 감점하지 않는다)
+      하락박스 쌍바닥 +3: 224선 아래 + 60봉 저점 대비 +5~20% + 최근 저점 > 직전 저점
+      횡보박스 — 손절 위험: 224선 위 +0~+15%에서 60봉 고저폭 30% 이하(배지, 감점 없음)
+      좁은 박스 −3: 60봉 고저 변동폭 10~15%(먹을 게 없는 박스 → 후순위) */
+const maCloseOf = (bars, n, i) => {
+  if (!bars || i < n - 1) return null;
+  let s = 0;
+  for (let k = i - n + 1; k <= i; k++) s += bars[k].c;
+  return s / n;
+};
+const ympCache = new Map();
+function ympOf(r) {
+  const key = [r.code, r.price, r.ma112, r.ma224, r.ma448, chartState.fetchedAt || 0].join("|");
+  const hit = ympCache.get(key);
+  if (hit) return hit;
+  const v = ympCalc(r);
+  ympCache.set(key, v);
+  return v;
+}
+function ympCalc(r) {
+  const none = { ok: false, hit: 0, adj: 0, name: "", conds: [], dev112: null, dev224: null,
+                 low60: null, box10: null, m5: null, m20: null, m60: null, blocked: "", note: "" };
+  const bars = barsFor(r);
+  const n = bars ? bars.length : 0;
+  const last = n ? bars[n - 1] : null;
+  const price = r.price || (last && last.c) || null;
+  const ma112 = r.ma112 || (last && last.m112) || null;
+  const ma224 = r.ma224 || (last && last.m224) || null;
+  const ma448 = r.ma448 || (last && last.m448) || null;
+  if (!price || !ma112 || !ma224 || !ma448 || n < 60) return none;
+  const dev112 = (price - ma112) / ma112 * 100;
+  const dev224 = (price - ma224) / ma224 * 100;
+  /* 예외 ① 52주 신저가 경고 종목은 역매공파 후보에서 뺀다 */
+  if (low52Flag(r)) return { ...none, dev112: dev112, dev224: dev224, blocked: "52주 신저가 경고" };
+  /* 예외 ② 224선 위로 재안착한 경우만 인정(골파기 재안착과 같은 조건) */
+  if (!(dev224 > 0)) return { ...none, dev112: dev112, dev224: dev224, blocked: "224선 아래" };
+
+  /* ① 역배열 — 448선이 맨 위, 224선 중간, 112선이 맨 아래 */
+  const c1 = ma448 > ma224 && ma224 > ma112;
+  /* ② 112선 근접 */
+  const c2 = dev112 >= -3 && dev112 <= 5;
+  /* ③ 단기 정배열(20·60선 안착) — 120봉 종가로 5·20·60일선 계산 */
+  const m5 = maCloseOf(bars, 5, n - 1), m20 = maCloseOf(bars, 20, n - 1), m60 = maCloseOf(bars, 60, n - 1);
+  const c3 = !!(m5 != null && m20 != null && m60 != null && m5 > m20 && m20 > m60);
+  /* ④ 최근 20봉 매집봉 */
+  let accMult = null, accDate = null;
+  for (let i = Math.max(20, n - 20); i < n; i++) {
+    let s = 0;
+    for (let k = i - 20; k < i; k++) s += (bars[k].v || 0);
+    const avg = s / 20;
+    if (avg > 0 && bars[i].v >= avg * 2 && bars[i].c > bars[i].o) { accMult = bars[i].v / avg; accDate = bars[i].d; }
+  }
+  const c4 = accMult != null;
+  /* ⑤ 공구리 — 60봉 저점 대비 +3~+15% 자리에서 최근 10봉 고저폭 8% 이하인 작은 지지 박스 */
+  let low60 = Infinity;
+  for (let i = Math.max(0, n - 60); i < n; i++) { const v = bars[i].l == null ? bars[i].c : bars[i].l; if (v < low60) low60 = v; }
+  const fromLow = (isFinite(low60) && low60 > 0) ? (price - low60) / low60 * 100 : null;
+  let h10 = -Infinity, l10 = Infinity;
+  for (let i = Math.max(0, n - 10); i < n; i++) {
+    const h = bars[i].h == null ? bars[i].c : bars[i].h, l = bars[i].l == null ? bars[i].c : bars[i].l;
+    if (h > h10) h10 = h; if (l < l10) l10 = l;
+  }
+  const box10 = (isFinite(h10) && isFinite(l10) && l10 > 0) ? (h10 - l10) / l10 * 100 : null;
+  const c5 = fromLow != null && box10 != null && fromLow >= 3 && fromLow <= 15 && box10 <= 8;
+  /* ⑥ 파란 점선(볼린저 중심선) 위 + 밴드폭 수축 */
+  const bb = bandOf(r);
+  const c6 = !!(bb.ok && bb.mid != null && price >= bb.mid && bb.bwPct != null && bb.bwPct <= 30);
+  const conds = [
+    { k: "역배열", ok: c1, v: won(ma448) + ">" + won(ma224) + ">" + won(ma112) },
+    { k: "112선 근접", ok: c2, v: (dev112 >= 0 ? "+" : "") + fx(dev112, 1) + "%" },
+    { k: "단기 정배열", ok: c3, v: (m5 == null ? "—" : won(m5)) + ">" + (m20 == null ? "—" : won(m20)) + ">" + (m60 == null ? "—" : won(m60)) },
+    { k: "매집봉", ok: c4, v: accMult == null ? "없음" : String(accDate).slice(5) + " " + fx(accMult, 1) + "배" },
+    { k: "공구리", ok: c5, v: (fromLow == null ? "—" : "+" + fx(fromLow, 1) + "%") + (box10 == null ? "" : " · 10봉폭 " + fx(box10, 1) + "%") },
+    { k: "볼린저", ok: c6, v: bb.ok ? "밴드폭 하위 " + Math.round(bb.bwPct) + "%" : "—" }
+  ];
+  const hitN = conds.filter(c => c.ok).length;
+  let adj = hitN >= 5 ? 8 : hitN === 4 ? 4 : 0;
+  let name = hitN >= 5 ? "역매공파 성립" : hitN === 4 ? "역매공파 근접" : "";
+  let blocked = "";
+  /* 224선 이격 과열 감점이 걸리면 감점 우선 */
+  if (adj && bb.heat < 0) { adj = 0; blocked = "과열"; }
+  const met = conds.filter(c => c.ok).map(c => c.k).join(" · ");
+  const note = adj
+    ? "6요소 중 " + hitN + "개 성립(" + met + ") — " + name + " +" + adj + ". " +
+      (hitN >= 5 ? "역배열 바닥에서 공구리와 단기 정배열이 겹친 자리라 세력 출발 자리로 봐." : "역배열 + 공구리 축은 갖췄으니 224선 위에서 눌림을 기다려.")
+    : hitN >= 4
+      ? "6요소 중 " + hitN + "개 성립(" + met + ")이지만 224선 이격 +" + fx(dev224, 1) + "% 과열 감점이 걸려 가점 없이 배지만 표시해."
+      : "6요소 중 " + hitN + "개만 맞아(부족: " + conds.filter(c => !c.ok).map(c => c.k).join(" · ") + ").";
+  return { ok: hitN >= 5, hit: hitN, adj: adj, name: name, conds: conds, dev112: dev112, dev224: dev224,
+           low60: isFinite(low60) ? low60 : null, box10: box10, m5: m5, m20: m20, m60: m60, blocked: blocked, note: note };
+}
+
+const jbnCache = new Map();
+function jbnOf(r) {
+  const key = [r.code, r.price, r.ma224, chartState.fetchedAt || 0].join("|");
+  const hit = jbnCache.get(key);
+  if (hit) return hit;
+  const v = jbnCalc(r);
+  jbnCache.set(key, v);
+  return v;
+}
+function jbnCalc(r) {
+  const none = { ok: false, pct: null, recent: null, prior: null, delta: null, days: 0, adj: 0, sell: false, aboveN: 0, note: "" };
+  const bars = barsFor(r);
+  if (!bars || bars.length < 60) return none;
+  const win = bars.slice(-120);
+  const isAbove = (b) => b.m224 != null && b.c > b.m224;
+  const aboveN = win.filter(isAbove).length;
+  const pct = aboveN / win.length * 100;
+  let recent = null, prior = null, delta = null;
+  if (bars.length >= 120) {
+    const share = (arr) => arr.filter(isAbove).length / arr.length * 100;
+    recent = share(bars.slice(-60));
+    prior = share(bars.slice(-120, -60));
+    delta = recent - prior;
+  }
+  const lvAdj = pct >= 60 ? 3 : 0;
+  const swAdj = (delta != null && delta >= 15) ? 4 : 0;
+  const adj = lvAdj + swAdj;
+  const sell = pct < 30;
+  const note = "최근 " + win.length + "거래일 중 종가가 224선 위에 있던 봉이 " + aboveN + "일(" + fx(pct, 0) + "%)" +
+    (delta == null ? "" : " — 최근 60봉 " + fx(recent, 0) + "% vs 직전 60봉 " + fx(prior, 0) + "%로 " +
+      (delta >= 0 ? "+" : "") + fx(delta, 1) + "%p 전환") +
+    (sell ? ". 224선 아래 공간이 압도적이야 — 매도 지분 우위라 아직 살 자리가 아니야(감점은 없음)."
+          : adj ? ". 224선 위에 쌓인 매수 지분이 우위야" + (swAdj ? " — 지분이 60일 사이 매수 쪽으로 넘어온 전환 자리" : "") + "."
+                : ". 매수·매도 지분이 반반에 가까워 추세 판정은 아직이야.");
+  return { ok: adj > 0, pct: pct, recent: recent, prior: prior, delta: delta, days: win.length, adj: adj,
+           sell: sell, aboveN: aboveN, note: note };
+}
+
+const boxCache = new Map();
+function boxOf(r) {
+  const key = [r.code, r.price, r.ma224, chartState.fetchedAt || 0].join("|");
+  const hit = boxCache.get(key);
+  if (hit) return hit;
+  const v = boxCalc(r);
+  boxCache.set(key, v);
+  return v;
+}
+function boxCalc(r) {
+  const none = { ok: false, adj: 0, late: false, touches: 0, downDouble: false, side: false, narrow: false,
+                 range: null, dev: null, fromLow: null, double: null, lo1: null, lo0: null, note: "" };
+  const bars = barsFor(r);
+  if (!bars || bars.length < 60) return none;
+  const n = bars.length, last = bars[n - 1];
+  const price = r.price || last.c;
+  const ma224 = r.ma224 || last.m224 || null;
+  if (!price || !ma224) return none;
+  const dev = (price - ma224) / ma224 * 100;
+  /* 박스 크기 — 최근 60봉 고저 변동폭 */
+  let hi = -Infinity, lo = Infinity;
+  for (let i = Math.max(0, n - 60); i < n; i++) {
+    const h = bars[i].h == null ? bars[i].c : bars[i].h, l = bars[i].l == null ? bars[i].c : bars[i].l;
+    if (h > hi) hi = h; if (l < lo) lo = l;
+  }
+  const range = (isFinite(hi) && isFinite(lo) && lo > 0) ? (hi - lo) / lo * 100 : null;
+  const fromLow = (isFinite(lo) && lo > 0) ? (price - lo) / lo * 100 : null;
+  /* 40봉 내 224선 ±1.5% 터치 횟수 — 붙어 있는 봉은 한 번으로 센다 */
+  let touches = 0, inBand = false;
+  for (let i = Math.max(0, n - 41); i <= n - 2; i++) {
+    const L = bars[i].m224;
+    const bLo = bars[i].l == null ? bars[i].c : bars[i].l, bHi = bars[i].h == null ? bars[i].c : bars[i].h;
+    const t = !!(L && bLo <= L * 1.015 && bHi >= L * 0.985);
+    if (t && !inBand) touches++;
+    inBand = t;
+  }
+  /* 쌍바닥 — 최근 20봉 저점이 직전 20봉 저점보다 높다 */
+  let lo1 = Infinity, lo0 = Infinity;
+  for (let i = Math.max(0, n - 20); i < n; i++) { const v = bars[i].l == null ? bars[i].c : bars[i].l; if (v < lo1) lo1 = v; }
+  for (let i = Math.max(0, n - 40); i < n - 20; i++) { const v = bars[i].l == null ? bars[i].c : bars[i].l; if (v < lo0) lo0 = v; }
+  const double = isFinite(lo1) && isFinite(lo0) && lo1 > lo0;
+  /* 늦은 돌파 — 박스(224선)를 이미 세 번 이상 두드린 뒤 지금 위로 뚫는 중이면 늦다.
+     같은 자리에서 골파기 후 재안착이 인정되면 재안착을 우선한다. */
+  const dig = digOf(r);
+  const late = touches >= 3 && dev > 0 && dev <= 8 && !dig.ok;
+  const downDouble = dev < 0 && fromLow != null && fromLow >= 5 && fromLow <= 20 && double;
+  const side = dev >= 0 && dev <= 15 && range != null && range <= 30;
+  const narrow = range != null && range >= 10 && range <= 15;
+  const adj = (downDouble ? 3 : 0) - (late ? 4 : 0) - (narrow ? 3 : 0);
+  const bits = [];
+  if (range != null) bits.push("60봉 변동폭 " + fx(range, 1) + "%" + (range >= 30 ? "(중파동 후보)" : range >= 15 ? "" : "(좁은 박스 — 먹을 게 적음)"));
+  if (touches) bits.push("40봉 내 224선 터치 " + touches + "회");
+  if (late) bits.push("터치 뒤 지금 돌파 = 박스가 보이는 늦은 자리(−4)");
+  if (downDouble) bits.push("224선 아래에서 저점을 높인 하락박스 쌍바닥(+3) — 가장 안정적인 자리");
+  if (side && !downDouble) bits.push("224선 위 횡보 박스 — 물리면 손절이 크게 나는 자리(배지만)");
+  if (narrow) bits.push("10~15% 좁은 박스라 목표 폭이 작아 후순위(−3)");
+  const note = bits.join(" · ") + (bits.length ? "" : "60봉 박스 판정에 쓸 봉이 부족해.");
+  return { ok: adj !== 0 || late || downDouble || side || narrow, adj: adj, late: late, touches: touches,
+           downDouble: downDouble, side: side, narrow: narrow, range: range, dev: dev, fromLow: fromLow,
+           double: double, lo1: isFinite(lo1) ? lo1 : null, lo0: isFinite(lo0) ? lo0 : null, note: note };
+}
+
 /* 3년 대시세 주의 — 시트 위험경고 문구로만 판별(점수 감점 없음) */
 function daeSeOf(r) {
   return warnList(r).some(x => /3년\s*대시세/.test(x));
@@ -1655,9 +1861,11 @@ function supplyOf(r) {
   if (w.some(x => /윗꼬리/.test(x))) { warnAdj += 6; warnHit.push("윗꼬리 음봉"); }
   if (w.some(x => /2배|급등/.test(x))) { warnAdj += 5; warnHit.push("단기 급등"); }
   if (low52Flag(r)) { warnAdj += 8; warnHit.push("52주 신저가"); }
+  /* v1.11.0 ⑧ 지분(持分) — 224선 위에 쌓인 캔들 비율과 60일 전환 */
+  const jbn = jbnOf(r);
 
-  const total = Math.round(clamp(rsPart + pullPart + freqPart + powerPart + boxPart + brkPart - warnAdj, 0, 100));
-  return { total, rs, rsPart, pullPart, freqPart, powerPart, boxPart, brkPart, boxAcc, brk, warnAdj, warnHit,
+  const total = Math.round(clamp(rsPart + pullPart + freqPart + powerPart + boxPart + brkPart - warnAdj + jbn.adj, 0, 100));
+  return { total, rs, rsPart, pullPart, freqPart, powerPart, boxPart, brkPart, boxAcc, brk, warnAdj, warnHit, jbn,
            hasChart: !!(cb && cb.length >= 40) };
 }
 function bowlShort(b) {
@@ -1673,6 +1881,9 @@ function supplyNote(r, s) {
     if (s.boxAcc != null) bits.push("바닥·박스권 매집 " + s.boxAcc + "회");
     bits.push(s.brk ? "추세 돌파 양봉 있음" : "추세 돌파 양봉 없음");
   }
+  if (s.jbn && s.jbn.pct != null) bits.push("224선 지분 " + fx(s.jbn.pct, 0) + "%" +
+    (s.jbn.delta == null ? "" : " · 60일 전환 " + (s.jbn.delta >= 0 ? "+" : "") + fx(s.jbn.delta, 1) + "%p") +
+    (s.jbn.sell ? " 매도 우위" : ""));
   if (s.warnAdj) bits.push("위험경고 −" + s.warnAdj);
   return bits.join(" · ");
 }
@@ -1692,8 +1903,10 @@ function lineOf(r) {
   const mature = matureOf(r);
   const angle = angleOf(r);
   const dig = digOf(r);
-  const total = Math.round(clamp(base + bowl.adj + bbAdj + mature.adj + angle.adj + dig.adj, 0, 100));
-  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, mature, angle, dig, total };
+  const ymp = ympOf(r);
+  const box = boxOf(r);
+  const total = Math.round(clamp(base + bowl.adj + bbAdj + mature.adj + angle.adj + dig.adj + ymp.adj + box.adj, 0, 100));
+  return { ...m, convPart, posPart, trendPart, accPart, divPart, base, bowl, bb, bbAdj, mature, angle, dig, ymp, box, total };
 }
 
 /* ── 기업체력 20% (0~100): 기존 재무 점수 + 유보율·최대주주 안정성 ── */
@@ -1868,6 +2081,9 @@ async function syncChart() {
     matureCache.clear();
     angleCache.clear();
     digCache.clear();
+    ympCache.clear();
+    jbnCache.clear();
+    boxCache.clear();
     renderHero();
     renderReco();
     const sheet = document.getElementById("detail");
@@ -2632,6 +2848,16 @@ function cardHTML(r, pos) {
       (ln.mature.ok ? '<span class="tag t-teal">224선 숙성 ' + ln.mature.days + '일</span>' : "") +
       (ln.angle.ok ? '<span class="tag t-teal">각도술 완만 눌림</span>' : "") +
       (ln.dig.ok ? '<span class="tag t-teal">🕳️ 골파기 재안착</span>' : "") +
+      (ln.ymp.adj ? '<span class="tag t-teal">🔱 ' + esc(ln.ymp.name) + ' ' + ln.ymp.hit + '/6 +' + ln.ymp.adj + '</span>'
+        : (ln.ymp.hit >= 4 && ln.ymp.blocked === "과열" ? '<span class="tag t-amber">🔱 역매공파 과열 제외</span>' : "")) +
+      (ln.box.downDouble ? '<span class="tag t-teal">📦 하락박스 쌍바닥</span>' : "") +
+      (ln.box.late ? '<span class="tag t-red">📦 늦은 돌파 주의</span>' : "") +
+      (ln.box.side && !ln.box.downDouble ? '<span class="tag t-amber">📦 횡보박스 — 손절 위험</span>' : "") +
+      (ln.box.narrow ? '<span class="tag t-amber">📦 좁은 박스 ' + fx(ln.box.range, 0) + '%</span>' : "") +
+      (s.jbn.pct != null ? (s.jbn.sell
+        ? '<span class="tag t-red">지분 ' + fx(s.jbn.pct, 0) + '% 매도 우위</span>'
+        : '<span class="tag ' + (s.jbn.adj ? "t-teal" : "") + '">지분 ' + fx(s.jbn.pct, 0) + '%' +
+            (s.jbn.delta == null ? "" : ' · 전환 ' + (s.jbn.delta >= 0 ? "+" : "") + fx(s.jbn.delta, 0) + '%p') + '</span>') : "") +
       (daeSeOf(r) ? '<span class="tag t-amber">3년 대시세 주의</span>' : "") +
       (f.mcap != null ? '<span class="tag">시총 ' + capText(f.mcap) + '</span>' : "") +
     '</div>' +
@@ -2995,11 +3221,12 @@ function openDetail(key) {
       '</div>' +
       '<div class="tsum" style="margin-top:9px">밥그릇: <b>' + esc(ln.bowl.name) + '</b> — ' + esc(ln.bowl.note) + '</div>' +
       '<div class="tsum">수급(수박 참고용): ' + esc(supplyNote(r, sup)) + ' → <b>' + sup.total + '점</b></div>' +
+      (sup.jbn.pct != null ? '<div class="tsum" style="color:' + (sup.jbn.sell ? "var(--red)" : sup.jbn.adj ? "var(--teal)" : "var(--muted)") + '">🎯 지분(持分) — ' + esc(sup.jbn.note) + (sup.jbn.adj ? ' → +' + sup.jbn.adj : '') + '</div>' : '') +
       '<div class="cmpv ' + cv.cls + '" style="margin:12px 0 0">' + cv.text + '</div>' +
     '</div>' +
     '<div class="card" style="margin:0 0 12px">' +
       '<h3>세력선(차트) 매력도</h3>' +
-      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정 + 224선 숙성·각도술 보정 + 골파기 재안착 보정으로 100점</p>' +
+      '<p class="hint">수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리 + 볼린저·신고가눌림·이격 보정 + 224선 숙성·각도술 보정 + 골파기 재안착 보정 + 역매공파·박스권 보정으로 100점</p>' +
       '<div style="display:flex;gap:16px;align-items:center">' +
         '<div class="big-gauge ' + gaugeClass(ln.total) + '" style="--p:' + ln.total + '"><span><b>' + ln.total + '</b><small>세력선 점수</small></span></div>' +
         '<div style="flex:1">' +
@@ -3014,6 +3241,10 @@ function openDetail(key) {
           (ln.mature.ok ? '<div class="brk"><span>224선 숙성 ' + ln.mature.days + '일</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.mature.adj + '</b></div>' : '') +
           (ln.angle.ok ? '<div class="brk"><span>각도술 완만 눌림</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.angle.adj + '</b></div>' : '') +
           (ln.dig.ok ? '<div class="brk"><span>골파기 재안착</span><i style="--w:' + barW(3, 9) + '"></i><b>+' + ln.dig.adj + '</b></div>' : '') +
+          (ln.ymp.adj ? '<div class="brk"><span>역매공파 ' + ln.ymp.hit + '/6</span><i style="--w:' + barW(ln.ymp.adj, 9) + '"></i><b>+' + ln.ymp.adj + '</b></div>' : '') +
+          (ln.box.downDouble ? '<div class="brk"><span>하락박스 쌍바닥</span><i style="--w:' + barW(3, 9) + '"></i><b>+3</b></div>' : '') +
+          (ln.box.late ? '<div class="brk"><span>늦은 돌파 주의</span><i class="neg" style="--w:' + barW(4, 12) + '"></i><b>-4</b></div>' : '') +
+          (ln.box.narrow ? '<div class="brk"><span>좁은 박스 ' + fx(ln.box.range, 0) + '%</span><i class="neg" style="--w:' + barW(3, 12) + '"></i><b>-3</b></div>' : '') +
         '</div>' +
       '</div>' +
       '<div class="note">' + esc(ln.bowl.note) + '</div>' +
@@ -3021,6 +3252,9 @@ function openDetail(key) {
       (ln.mature.ok ? '<div class="tsum" style="color:var(--teal)">🫙 224선 숙성 — ' + esc(ln.mature.note) + '</div>' : '') +
       (ln.angle.ok ? '<div class="tsum" style="color:var(--teal)">📐 각도술 — ' + esc(ln.angle.note) + '</div>' : '') +
       (ln.dig.ok ? '<div class="tsum" style="color:var(--teal)">🕳️ 골파기 재안착 — ' + esc(ln.dig.note) + '</div>' : '') +
+      (ln.ymp.conds.length && ln.ymp.hit >= 4 ? '<div class="tsum" style="color:' + (ln.ymp.adj ? "var(--teal)" : "var(--amber)") + '">🔱 ' + esc(ln.ymp.name || "역매공파 미성립") + ' — ' + esc(ln.ymp.note) + '</div>' +
+        '<div class="tsum" style="color:var(--muted)">' + ln.ymp.conds.map(c => (c.ok ? "✅ " : "⬜ ") + esc(c.k) + " " + esc(c.v)).join(" · ") + '</div>' : '') +
+      (ln.box.note ? '<div class="tsum" style="color:' + (ln.box.adj < 0 ? "var(--amber)" : ln.box.adj > 0 ? "var(--teal)" : "var(--muted)") + '">📦 박스권 — ' + esc(ln.box.note) + '</div>' : '') +
       (daeSeOf(r) ? '<div class="note warn">📈 3년 대시세 주의 — 최근 3년(약 750거래일) 안에 최저점 대비 +200% 이상 대시세(엘리엇 3파 급등)를 이미 지난 종목이야. 큰 파동 뒤 조정이 길어질 수 있어서 추격 대신 224선 눌림에서 소액·분할로만 들어가.</div>' : '') +
     '</div>' +
     '<div class="card chartcard" id="chartCard" style="margin:12px 0">' + chartCardHTML(r) + '</div>' +
@@ -3098,7 +3332,7 @@ function openDetail(key) {
       (r.risk ? '<div class="note warn">위험 플래그가 켜진 종목이야. 비중을 줄이거나 관찰만 하자.</div>' : "") +
     '</div>' +
     (r.note ? '<div class="note">' + esc(r.note) + '</div>' : "") +
-    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12 · 224선 숙성(80거래일+) +3 · 각도술 완만 눌림 +3 · 골파기 후 재안착(최근 20거래일 내 224선 -1% 이탈 뒤 0~+12% 재안착) +3 (100점 상한). 3년 대시세 주의는 점수를 깎지 않고 배지·코멘트로만 표시. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
+    '<p class="hint" style="margin:12px 2px 0">총 매력도 = 수급 × 0.4 + 세력선 × 0.4 + 기업체력 × 0.2 (4:4:2), 100점 만점. 수급 = RS 35 + 눌림 거래량 25 + 매집봉 빈도 12 + 매집 거래량 강도 8 + 바닥·박스권 매집 10 + 돌파 양봉 10 + 224선 지분(60% 이상 +3 · 60일 전환 +15%p 이상 +4) − 위험경고(장대음봉·윗꼬리·52주 신저가). 세력선 = 수렴 40 + 224선 자리 20 + 정배열 10 + 매집봉 15 + 배당 5 + 밥그릇 자리(3번 눌림 +10 · 초입 +7 · 4번 −12 · 1번 −10) + 볼린저 수축·지지 +5 · 반년 신고가 후 224선 눌림 +4 · 224선 이격 +18% 이상 −8~−12 · 224선 숙성(80거래일+) +3 · 각도술 완만 눌림 +3 · 골파기 후 재안착(최근 20거래일 내 224선 -1% 이탈 뒤 0~+12% 재안착) +3 · 역매공파(6요소 중 5개 이상 +8 · 4개 +4, 52주 신저가·224선 아래·과열 시 제외) · 박스권(하락박스 쌍바닥 +3 · 늦은 돌파 −4 · 좁은 박스 −3) (100점 상한). 지분율 30% 미만(매도 지분 우위)과 횡보박스·3년 대시세는 점수를 깎지 않고 배지로만 표시. 기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정. 세력선은 타이밍, 재무는 회사의 튼튼함, 수급은 세력이 아직 안 빠졌는지야.</p>' +
     '<div class="row" style="margin-top:14px"><button class="btn ghost block" data-act="closeDetail">닫기</button></div>';
   $("#detailInner").innerHTML = html;
   $("#detail").classList.remove("hidden");
@@ -3484,6 +3718,10 @@ function renderSetup() {
     '<b>v1.10.0 3년 대시세 주의</b> — 시트 <b>추천종목</b> 탭 AH열 <b>위험경고</b>에 `3년 대시세 주의`가 들어오면(최근 3년 내 최저점 대비 +200% 이상 대시세 이력) 카드에 📈 배지와 코멘트로만 표시하고 점수는 깎지 않아. 이미 큰 파동을 지난 종목이라는 뜻이라 추격 대신 224선 눌림에서 소액·분할로 들어가는 자리야.<br>' +
     '<b>v1.10.1 기간 에너지별 분할 익절</b> — 차트의 힘은 파동 에너지 + 기간 에너지야. <b>짧은 수렴(1개월 미만)</b>은 1차 목표 +15~20%에서 전량 익절해 빠르게 회전하고, <b>긴 숙성(224선 아래 80거래일 이상 또는 볼린저 밴드폭 120일 하위 30% 수축)</b>은 1차 목표 +20%에서 50%만 절반 익절한 뒤 나머지 50%는 손절가를 본절(매수가) 위로 올려 장대양봉 2~3파동(5일선 이탈 전까지) 추세를 추적해. 상세 목표가 카드와 매매일지 보유 종목에 1차 목표가·절반 수량이 자동 계산돼. 앱 차트가 120봉까지만 보므로 그보다 긴 숙성은 화·목 스캔이 시트 근거에 적은 `224선 아래 N거래일 숙성`을 함께 읽어 긴 숙성으로 판정해.<br>' +
     '<b>v1.10.2 골파기 후 재안착</b> — 차트데이터 120봉으로 <b>최근 20거래일(당일 제외)</b> 안에 세력선(224선 우선, 없으면 112선) 위에 있던 종가가 한 번 <b>-1% 이상 아래로 이탈(골파기·개미 털기)</b>했다가, 오늘 다시 같은 선 위 <b>0~+12%</b>로 올라탄 종목에 세력선 <b>+3</b>을 줘. 위아래 흔들기 뒤 재안착은 출발 신호지만, 아래로 다시 깨지면 바로 손절이야 — 그래서 오늘 다시 선 아래로 내려온 종목은 가점 없이 제외해. 배지와 세력선 점수 근거에 `골파기 재안착`으로 표시돼.<br>' +
+    '<b>v1.11.0 역매공파 · 지분(持分) · 박스권</b> — 주식단테 재생목록 3개를 앱 판정으로 옮겼어.<br>' +
+    '· <b>역매공파(세력선 +8 / 근접 +4)</b>: ① 역배열(448&gt;224&gt;112) ② 112선 −3~+5% 근접 ③ 단기 정배열(5&gt;20&gt;60일선) ④ 최근 20봉 매집봉(양봉 + 20일평균 2배) ⑤ 공구리(60봉 저점 대비 +3~+15% & 최근 10봉 고저폭 8% 이하) ⑥ 볼린저 중심선 위 + 밴드폭 120일 하위 30% — 6개 중 <b>5개 이상이면 `역매공파 성립` +8, 4개면 `근접` +4</b>. <b>52주 신저가 경고 종목은 제외</b>하고, <b>224선 위로 재안착(현재가 &gt; 224선)한 경우만</b> 인정해(골파기 재안착과 같은 조건). 224선 이격 +18% 이상 과열 감점과 겹치면 감점을 우선해 가점 없이 배지만 남겨.<br>' +
+    '· <b>지분율(수급 안)</b>: 최근 120거래일 중 <b>종가가 그날 224선 위에 있던 봉의 비율</b>이야. 60% 이상이면 매수세 우위로 <b>+3</b>, <b>최근 60봉 지분율 − 직전 60봉 지분율이 +15%p 이상</b>이면 지분이 넘어오는 전환 자리로 <b>+4</b>(합쳐 최대 +7). 30% 미만이면 `매도 지분 우위` 배지(감점 없음). 카드에는 `지분 63% · 전환 +22%p`처럼 표시되고, 1년 이력이 아니라 <b>최근 120일 지분</b>이라는 점만 기억해.<br>' +
+    '· <b>박스권 필터(세력선 안)</b>: 40봉 안에 224선을 3회 이상 두드린 뒤 지금 위로 뚫는 중이면 <b>`늦은 돌파 주의` −4</b>(박스가 눈에 보이면 늦다는 뜻 — 단, 같은 자리에서 골파기 후 재안착이 인정되면 재안착을 우선해 감점하지 않아), 224선 아래에서 60봉 저점 대비 +5~20%이며 저점을 높인 자리는 <b>`하락박스 쌍바닥` +3</b>(가장 안정적인 자리), 224선 위 횡보 박스는 <b>`횡보박스 — 손절 위험` 배지</b>(감점 없음), 60봉 변동폭이 <b>10~15% 좁은 박스는 −3</b>(목표 폭이 작아 후순위). 30% 이상이면 중파동 후보로 코멘트만 붙여.<br>' +
     '밥그릇 자리는 차트데이터 120봉으로 ① 1번 하락·투매 ② 2번 바닥 횡보 ③ 3번 224선 돌파·눌림(핵심 타점) ④ 4번 급등 추격을 판별해. 빠른 회전을 위해 3번 자리를 가장 높게 쳐.<br>' +
     '일봉 차트는 시트 <b>차트데이터</b> 탭(최근 120거래일 시·고·저·종가·거래량 + 112·224·448일선)을 읽어 그려. 실패하면 마지막에 받아둔 차트로 보여줄게. 차트의 <b>볼린저(20,2)</b> 토글을 켜면 상·하단(2σ)과 중심선(MA20)이 얇게 그려져.<br>' +
     '기업 체력 = PER 30 + PBR 20 + ROE 25 + 부채비율 15 + 3년 흑자 10 + 유보율·최대주주 보정(최대 ±10). 총 매력도 = 4:4:2 — 수급 40% + 세력선 40% + 기업체력 20% (100점 만점). PER·PBR은 최근 분기 실적(TTM), ROE·부채비율·유보율은 2025 사업연도 결산 기준(2026-11-23 네이버금융 조회).<br>' +
