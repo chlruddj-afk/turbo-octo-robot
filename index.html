@@ -154,7 +154,7 @@ select.sort{background:#0e1114;border:1px solid var(--line);color:var(--muted);b
 .sc-chips{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:14px}
 .tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:500;line-height:1.5;
   padding:0;border:0;border-radius:0;background:none;color:var(--dim)}
-.tag::before{content:'';width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.7;flex:0 0 3px}
+.tag::before{content:'';width:2.5px;height:2.5px;border-radius:50%;background:currentColor;opacity:.45;flex:0 0 2.5px}
 .tag.t-teal{background:none;color:var(--teal)}
 .tag.t-amber{background:none;color:var(--amber)}
 .tag.t-red{background:none;color:var(--red)}
@@ -348,7 +348,7 @@ table.t tr:last-child td{border-bottom:none}
 
 /* ── 하단 탭 · 토스트 ── */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:block;
-  background:rgba(10,11,12,.90);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);
+  background:rgba(10,11,12,.94);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);
   border-top:1px solid var(--line);padding:0 0 var(--safe-b)}
 .tabbar-inner{display:flex;width:100%;max-width:600px;margin:0 auto;background:none;border:0;border-radius:0;padding:6px 10px;box-shadow:none;backdrop-filter:none}
 @media(min-width:760px){ .tabbar-inner{max-width:680px} }
@@ -496,7 +496,7 @@ table.t tr:last-child td{border-bottom:none}
 /* ── 신호 · 체크 ── */
 .sigrow{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:12px}
 .sig{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:0;border-radius:0;letter-spacing:-0.01em;line-height:1.5;background:none;color:var(--muted)}
-.sig::before{content:'';width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.6;flex:0 0 4px}
+.sig::before{display:none}
 .sig.ok{background:none;color:var(--teal)}
 .sig.mid{background:none;color:var(--amber)}
 .sig.bad{background:none;color:var(--red)}
@@ -546,7 +546,9 @@ table.t tr:last-child td{border-bottom:none}
   .fm b{font-size:11.5px}
   .kv div{padding:9px 10px}
   .kv b{font-size:12.5px}
-  .lad .g{display:none}
+  .lad .t{flex:0 0 48px}
+  .lad .g{font-size:9.5px;max-width:44%;line-height:1.45}
+  .lad .v{font-size:12px}
   .toolbar select.sort{max-width:112px}
   .mkt-stage{font-size:10px;padding:3px 6px}
 }
