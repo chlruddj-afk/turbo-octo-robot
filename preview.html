@@ -9,9 +9,10 @@
 </style></head>
 <body>
 <div class="col"><div class="lbl" id="l1">390 × 844</div><div class="phone" id="p1"><iframe id="f1" src="index.html"></iframe></div></div>
-<div class="col"><div class="lbl" id="l2">360 × 800</div><div class="phone" id="p2"><iframe id="f2" src="index.html"></iframe></div></div>
+<div class="col" id="c2" style="display:none"><div class="lbl" id="l2">360 × 800</div><div class="phone" id="p2"><iframe id="f2" src="about:blank"></iframe></div></div>
 <script>
   const q = new URLSearchParams(location.search);
+  if (q.get('two')) { const c2 = document.getElementById('c2'); c2.style.display = ''; document.getElementById('f2').src = 'index.html'; }
   const W1 = +(q.get('w') || 390), H1 = +(q.get('h') || 844), Y1 = +(q.get('y') || 0);
   const W2 = +(q.get('w2') || 360), H2 = +(q.get('h2') || 800), Y2 = +(q.get('y2') || 0);
   const tab = q.get('tab') || '', detail = q.get('detail') || '';
@@ -19,6 +20,7 @@
   const f1 = document.getElementById('f1'), f2 = document.getElementById('f2');
   size(f1, document.getElementById('p1'), W1, H1);
   size(f2, document.getElementById('p2'), W2, H2);
+  if (!q.get('two')) { f2.style.height = '0px'; }
   document.getElementById('l1').textContent = W1 + ' × ' + H1 + ' · y=' + Y1 + (tab ? ' · tab=' + tab : '') + (detail ? ' · detail=' + detail : '');
   document.getElementById('l2').textContent = W2 + ' × ' + H2 + ' · y=' + Y2;
   f1.addEventListener('load', () => {
