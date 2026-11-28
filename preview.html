@@ -15,7 +15,8 @@
   if (q.get('two')) { const c2 = document.getElementById('c2'); c2.style.display = ''; document.getElementById('f2').src = 'index.html'; }
   const W1 = +(q.get('w') || 390), H1 = +(q.get('h') || 844), Y1 = +(q.get('y') || 0);
   const W2 = +(q.get('w2') || 360), H2 = +(q.get('h2') || 800), Y2 = +(q.get('y2') || 0);
-  const tab = q.get('tab') || '', detail = q.get('detail') || '';
+  const tab = q.get('tab') || '', detail = q.get('detail') || '', rev = q.get('rev') || '';
+  if (rev) document.getElementById('f1').src = 'index.html?rev=' + rev;
   function size(f, p, w, h) { f.style.width = w + 'px'; f.style.height = h + 'px'; p.style.width = w + 'px'; p.style.height = h + 'px'; }
   const f1 = document.getElementById('f1'), f2 = document.getElementById('f2');
   size(f1, document.getElementById('p1'), W1, H1);
