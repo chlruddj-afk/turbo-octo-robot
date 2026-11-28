@@ -471,12 +471,14 @@ table.t tr:last-child td{border-bottom:none}
 .mkt-gauge i{position:absolute;top:-3px;width:1px;height:10px;background:rgba(10,11,12,.55)}
 .mkt-scale{position:relative;height:16px;margin-top:6px}
 .mkt-scale span{position:absolute;top:0;font-size:8.5px;color:var(--dim);transform:translateX(-50%);white-space:nowrap;letter-spacing:0}
-.mkt-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:7px 0;border-bottom:1px solid var(--line-soft);color:var(--muted);line-height:1.5}
+.mkt-row{display:block;font-size:11px;padding:8px 0;border-bottom:1px solid var(--line-soft);color:var(--muted);line-height:1.5}
 .mkt-row:last-child{border-bottom:0}
+.mkt-row .mr-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .mkt-row b{color:var(--muted);font-weight:600;flex:0 0 auto;font-size:10.5px}
 .mkt-row.now{color:var(--text)}
 .mkt-row.now b{color:var(--teal)}
 .mkt-row span{flex:1;min-width:0;text-align:right}
+.mkt-row .act{display:block;font-style:normal;margin-top:3px;color:var(--dim);font-size:10px;text-align:left;line-height:1.5}
 .pool{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .pool label{font-size:10px;color:var(--dim);display:block;font-weight:500}
 .pool input{width:100%;margin-top:5px;background:#0e1114;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:13px}
@@ -2836,8 +2838,8 @@ function marketPanelHTML(m) {
   const cur = m.stage || "";
   const rows = ladder.map(l => {
     const on = !!cur && !!l.stage && (l.stage === cur || cur.indexOf(l.stage.replace(/\(.*\)/, "").trim()) >= 0);
-    return '<div class="mkt-row' + (on ? " now" : "") + '"><b>' + esc(l.stage) + '</b><span>' + esc(l.range) + ' · 예비현금 ' + esc(l.cash) + '%' +
-      (l.act ? '<br>' + esc(l.act) : '') + '</span></div>';
+    return '<div class="mkt-row' + (on ? " now" : "") + '"><div class="mr-top"><b>' + esc(l.stage) + '</b><span>' + esc(l.range) + ' · 예비현금 ' + esc(l.cash) + '%</span></div>' +
+      (l.act ? '<em class="act">' + esc(l.act) + '</em>' : '') + '</div>';
   }).join("");
   const ticks = [[0, "고점"], [33.3, "-20%"], [50, "-30%"], [75, "-45%"], [91.7, "-55%"]];
   return '<div class="mkt-gauge"><span class="pin" style="left:' + pos.toFixed(1) + '%"></span>' +
