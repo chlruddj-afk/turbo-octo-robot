@@ -50,8 +50,9 @@ a{color:var(--teal)}
 .hidden{display:none !important}
 #app{max-width:600px;margin:0 auto;padding:0 16px calc(76px + var(--safe-b));}
 @media(min-width:760px){ #app{max-width:680px;padding:0 24px calc(84px + var(--safe-b))}
-  .toolbar{flex-wrap:wrap;row-gap:8px}
-  .chips{flex-wrap:wrap;overflow:visible} }
+  .toolbar{flex-wrap:nowrap;align-items:flex-start}
+  .chips{flex-wrap:wrap;overflow:visible;padding-top:0}
+  .hero h1{font-size:30px} }
 
 /* ── 상단 바 ── */
 .topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -482,6 +483,9 @@ table.t tr:last-child td{border-bottom:none}
 .pool-res b{font-size:14px;color:var(--text);font-weight:700}
 .pool-res em{font-style:normal;color:var(--text);font-weight:600}
 .rsline{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin-top:12px;font-size:10.5px;color:var(--dim)}
+.rsline .tag{font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;line-height:1.5}
+.rsline .tag::before{display:none}
+.rsline .tag.t-violet{color:#aaa5c4;border-color:rgba(150,145,179,.26);background:rgba(150,145,179,.07)}
 .rsline b{color:var(--muted);font-size:11px;font-weight:600}
 .rs{font-style:normal;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0;border:1px solid transparent}
 .rs.s1{background:var(--teal-soft);color:var(--teal);border-color:rgba(79,191,160,.24)}
