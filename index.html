@@ -50,8 +50,9 @@ a{color:var(--teal)}
 .hidden{display:none !important}
 #app{max-width:600px;margin:0 auto;padding:0 16px calc(76px + var(--safe-b));}
 @media(min-width:760px){ #app{max-width:680px;padding:0 24px calc(84px + var(--safe-b))}
-  .toolbar{flex-wrap:nowrap;align-items:flex-start}
-  .chips{flex-wrap:wrap;overflow:visible;padding-top:0}
+  .toolbar{flex-wrap:wrap;row-gap:8px;align-items:center}
+  .chips{flex:1 1 100%;flex-wrap:wrap;overflow:visible;padding-top:0}
+  .toolbar select.sort{margin-left:auto;max-width:none}
   .hero h1{font-size:30px} }
 
 /* ── 상단 바 ── */
